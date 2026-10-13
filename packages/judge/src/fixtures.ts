@@ -93,7 +93,7 @@ const G = {
   nat: '국적 선호',
   annual: '반복 관람·활동량 (연간 가상 기록)',
   overlap: '겹침·무대 이동',
-  time: '메인 마지막·시간대',
+  time: '헤드라이너·시간대',
   streak: '연속 관람',
   edge: '기록 부족·입력 정책',
 };
@@ -426,7 +426,7 @@ export function buildCases(): Case[] {
     },
   });
 
-  /* ── 메인 마지막·시간대 ── */
+  /* ── 헤드라이너·시간대 ── */
   {
     const fs3 = () => [fest('FA', '가상 페스티벌 A (3일)', [stdDay('A1', '2026-05-15'), stdDay('A2', '2026-05-16'), stdDay('A3', '2026-05-17')])];
     const days3 = ['2026-05-15', '2026-05-16', '2026-05-17'];
@@ -434,38 +434,75 @@ export function buildCases(): Case[] {
       id: 'N4a',
       group: G.time,
       title: '마지막 공연만 챙겨 본 적은 관람 기록',
-      focus: '3일 모두 메인 마지막(M5) + 하루 2개 → 메인 마지막 2단계 (N4b와 같은 단계여야 함)',
+      focus: '3일 모두 메인 마지막(M5) + 하루 2개 → 헤드라이너 2단계 (N4b와 같은 단계여야 함)',
       catalog: mkCatalog(fs3()),
       record: { selections: days3.flatMap((d) => pick('FA', d, ['M5', 'A2', 'B1'])) },
-      expect: { rep: 'mainLast', checks: [tierIs('mainLast', 2)] },
+      expect: { rep: 'headliner', checks: [tierIs('headliner', 2)] },
     });
     cases.push({
       id: 'N4b',
       group: G.time,
       title: '마지막 공연도 보고 다른 공연도 많이 본 기록',
-      focus: '3일 모두 M5 + 하루 10개 → 메인 마지막은 N4a와 같은 2단계 (다른 공연 수에 영향받지 않음)',
+      focus: '3일 모두 M5 + 하루 10개 → 헤드라이너는 N4a와 같은 2단계 (다른 공연 수에 영향받지 않음)',
       catalog: mkCatalog(fs3()),
       record: { selections: days3.flatMap((d) => pick('FA', d, ['M0', 'A0', 'B0', 'M1', 'A1', 'B1', 'M2', 'A2', 'B2', 'M3', 'M5'])) },
-      expect: { rep: 'streak', checks: [tierIs('mainLast', 2)] },
+      expect: { rep: 'streak', checks: [tierIs('headliner', 2)] },
     });
     const lateSel = ['M2', 'M4', 'M5', 'A4', 'A5', 'B4'];
     cases.push({
       id: 'N5a',
       group: G.time,
       title: '하루 기록만 있는 경우',
-      focus: '후반 관람 패턴 하루 → 후반은 비율 지표라 3단계 가능, 메인 마지막은 표본 조건(2일)으로 0단계',
+      focus: '후반 관람 패턴 하루 → 후반은 비율 지표라 3단계 가능, 헤드라이너는 표본 조건(2일)으로 0단계',
       catalog: mkCatalog([fest('FA', '가상 페스티벌 A', [stdDay('A', '2026-05-16')])]),
       record: { selections: pick('FA', '2026-05-16', lateSel) },
-      expect: { rep: 'late', checks: [tierIs('late', 3), tierIs('mainLast', 0)] },
+      expect: { rep: 'late', checks: [tierIs('late', 3), tierIs('headliner', 0)] },
     });
     cases.push({
       id: 'C12',
       group: G.time,
-      title: '같은 성향이 3일 반복 · 후반과 메인 마지막 중복',
-      focus: 'N5a 패턴을 3일 반복 → 후반 3단계 그대로, 메인 마지막 2단계. 같은 기록으로 함께 높아지는지 확인',
+      title: '같은 성향이 3일 반복 · 후반과 헤드라이너 중복',
+      focus: 'N5a 패턴을 3일 반복 → 후반 3단계 그대로, 헤드라이너 2단계. 같은 기록으로 함께 높아지는지 확인',
       catalog: mkCatalog(fs3()),
       record: { selections: days3.flatMap((d) => pick('FA', d, lateSel)) },
-      expect: { rep: 'late', checks: [tierIs('late', 3), tierIs('mainLast', 2)] },
+      expect: { rep: 'late', checks: [tierIs('late', 3), tierIs('headliner', 2)] },
+    });
+
+    /* 마무리 공연이 서브 스테이지인 날: 템플릿 하루에 SUB1 A6(21:00~22:30)을 더한다. M5(20:30~22:00)와 60분 겹침.
+     * 하루 3개 중 메인 1개(M2)를 섞어 메인/서브 비율을 기준선(6/18)과 같게 맞춰 헤드라이너 지표만 보이게 한다 */
+    const closerDay = (tag: string, date: string, flag: boolean): FestivalDay => {
+      const d = stdDay(tag, date);
+      d.performances.push({ id: 'A6', stageId: 'SUB1', start: '21:00', end: '22:30', artistId: `K-${tag}·A6`, ...(flag ? { headliner: true } : {}) });
+      return d;
+    };
+    const fsCloser = (flag: boolean) => [fest('FC', '가상 페스티벌 C (서브 마무리)', days3.map((d, i) => closerDay(`C${i + 1}`, d, flag)))];
+    const headSeen = (n: number): Check => ({ label: `헤드라이너 본 날 ${n}일`, test: (r) => metric(r, 'headliner').numerator === n });
+    cases.push({
+      id: 'H1',
+      group: G.time,
+      title: '서브 스테이지 마무리 공연만 본 기록 (확인 후 헤드라이너 표시)',
+      focus: '3일 모두 A6(표시)만 보고 M5는 안 봄 → 헤드라이너로 인정, 2단계 (N4a와 같은 단계)',
+      catalog: mkCatalog(fsCloser(true)),
+      record: { selections: days3.flatMap((d) => pick('FC', d, ['A6', 'M2', 'B1'])) },
+      expect: { rep: 'headliner', checks: [tierIs('headliner', 2), headSeen(3)] },
+    });
+    cases.push({
+      id: 'H2',
+      group: G.time,
+      title: '메인 헤드라이너와 서브 마무리 공연을 둘 다 고른 기록',
+      focus: '3일 모두 M5·A6 둘 다 선택 → 하루 1일로만 집계, H1과 같은 3일·2단계 (둘 다 봤다고 더 높아지지 않음)',
+      catalog: mkCatalog(fsCloser(true)),
+      record: { selections: days3.flatMap((d) => pick('FC', d, ['M5', 'A6', 'M2', 'B1'])) },
+      expect: { rep: 'headliner', checks: [tierIs('headliner', 2), headSeen(3)] },
+    });
+    cases.push({
+      id: 'H3',
+      group: G.time,
+      title: '서브 마무리 공연을 봤지만 헤드라이너 표시가 없는 경우',
+      focus: 'H1과 같은 기록, 데이터에 표시 없음 → 확인 전에는 헤드라이너로 세지 않음, 0단계',
+      catalog: mkCatalog(fsCloser(false)),
+      record: { selections: days3.flatMap((d) => pick('FC', d, ['A6', 'M2', 'B1'])) },
+      expect: { rep: 'statsOnly', checks: [tierIs('headliner', 0), headSeen(0)] },
     });
   }
 

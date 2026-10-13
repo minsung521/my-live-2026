@@ -12,9 +12,14 @@
  *  - 하루에는 페스티벌 하나만 입력할 수 있다(입력 정책). 위반 기록은 판정하지 않는다.
  *  - 계산에서 제외한 날짜·공연은 관람 비율과 기준선 양쪽에서 똑같이 제외한다.
  *  - 시간 관련 수치는 선택한 공연의 시간표 기준 추정이며 실제 입·퇴장 시각이 아니다.
+ *
+ * v0.1.1 (2026-10-13)
+ *  - '메인 마지막 공연 관람' → '헤드라이너 관람'. 헤드라이너 = 메인 스테이지 마지막 공연(자동)
+ *    + 그날 마무리 공연이 메인 외 스테이지일 때 확인을 거쳐 `headliner: true`로 표시한 공연.
+ *    하루에 하나라도 보면 1일로 센다(둘 다 봐도 1일).
  */
 
-export const VERSION = 'v0.1';
+export const VERSION = 'v0.1.1';
 
 /* ───────────────────────────── 입력 타입 ───────────────────────────── */
 
@@ -41,6 +46,12 @@ export interface Performance {
   /** "HH:MM". 자정을 넘기면 24:30처럼 24 이상으로 적는다 */
   start: string;
   end: string;
+  /**
+   * 확인을 거쳐 헤드라이너로 추가한 공연. 그날 마무리 공연(시작 시각이 가장 늦은 공연)이
+   * 메인 외 스테이지에 있고, 공식 자료상 마무리·헤드라이너급 무대로 확인됐을 때만 표시한다.
+   * 메인 스테이지 마지막 공연은 자동으로 헤드라이너라 표시하지 않는다.
+   */
+  headliner?: boolean;
 }
 
 export interface FestivalDay {
@@ -95,8 +106,8 @@ export interface JudgeConfig {
     late: Tiers; // Δ %p
     watchTime: Tiers; // 프로그램 길이 대비 %
     streak: Tiers; // 분
-    /** 메인 마지막 공연: 단계별 (본 날 수 하한, 판정 가능 참가일 대비 비율 하한 %) */
-    mainLast: [{ days: number; rate: number }, { days: number; rate: number }, { days: number; rate: number }];
+    /** 헤드라이너 관람: 단계별 (본 날 수 하한, 판정 가능 참가일 대비 비율 하한 %) */
+    headliner: [{ days: number; rate: number }, { days: number; rate: number }, { days: number; rate: number }];
   };
   /** 같은 단계 동률일 때 쓰는 잠정 고정 순서 */
   order: { special: MetricId[]; base: MetricId[] };
@@ -125,7 +136,7 @@ export const DEFAULT_CONFIG: JudgeConfig = {
     late: [15, 25, 35],
     watchTime: [50, 65, 80],
     streak: [240, 330, 420],
-    mainLast: [
+    headliner: [
       { days: 2, rate: 60 },
       { days: 3, rate: 75 },
       { days: 4, rate: 90 },
@@ -133,7 +144,7 @@ export const DEFAULT_CONFIG: JudgeConfig = {
   },
   order: {
     special: ['repeat', 'festivals', 'japan', 'foreign'],
-    base: ['streak', 'subPref', 'early', 'watchTime', 'late', 'mainPref', 'mainLast'],
+    base: ['streak', 'subPref', 'early', 'watchTime', 'late', 'mainPref', 'headliner'],
   },
 };
 
@@ -144,7 +155,7 @@ export type MetricId =
   | 'festivals'
   | 'japan'
   | 'foreign'
-  | 'mainLast'
+  | 'headliner'
   | 'mainPref'
   | 'subPref'
   | 'early'
@@ -238,8 +249,12 @@ export interface DaySummary {
   lateStart: number;
   stageCount: number;
   mainStageId: string | null;
+  /** 메인 스테이지 마지막 공연 */
   mainLastKey: string | null;
-  mainLastSeen: boolean | null;
+  /** 그날 헤드라이너 전체 (메인 마지막 공연 + 확인 후 표시한 비메인 마무리 공연) */
+  headlinerKeys: string[];
+  /** 헤드라이너 중 하나라도 선택했는지. 헤드라이너가 없는 날은 null */
+  headlinerSeen: boolean | null;
   unionMin: number;
   segments: Segment[];
   clusters: Cluster[];
@@ -261,7 +276,7 @@ export interface Representative {
 }
 
 export interface Issue {
-  code: 'UNKNOWN_REF' | 'DATE_CONFLICT' | 'DUPLICATE';
+  code: 'UNKNOWN_REF' | 'DATE_CONFLICT' | 'DUPLICATE' | 'HEADLINER_SCOPE';
   message: string;
 }
 
@@ -373,6 +388,13 @@ interface RDay {
   stageIds: string[];
   mainStageId: string | null;
   mainLast: RPerf | null;
+  /** 메인 마지막 공연 + 확인 후 표시한 공연 (중복 없음) */
+  headliners: RPerf[];
+}
+
+/** 시작 시각이 가장 늦은 공연 (같으면 종료가 늦은 쪽) */
+function lastOf<T extends { start: number; end: number }>(list: T[]): T | null {
+  return list.length ? list.reduce((a, b) => (b.start > a.start || (b.start === a.start && b.end > a.end) ? b : a)) : null;
 }
 
 const perfKey = (festivalId: string, date: string, perfId: string) => `${festivalId}|${date}|${perfId}`;
@@ -406,9 +428,9 @@ function resolveDay(catalog: Catalog, festival: Festival, day: FestivalDay): RDa
   const stageIds = [...new Set(perfs.map((p) => p.stageId))];
   const main = festival.stages.find((s) => s.isMain);
   const mainPerfs = main ? perfs.filter((p) => p.stageId === main.id) : [];
-  const mainLast = mainPerfs.length
-    ? mainPerfs.reduce((a, b) => (b.start > a.start || (b.start === a.start && b.end > a.end) ? b : a))
-    : null;
+  const mainLast = lastOf(mainPerfs);
+  const flagged = perfs.filter((p, i) => day.performances[i].headliner && p !== mainLast);
+  const headliners = mainLast ? [mainLast, ...flagged] : flagged;
   return {
     festival,
     date: day.date,
@@ -421,6 +443,7 @@ function resolveDay(catalog: Catalog, festival: Festival, day: FestivalDay): RDa
     stageIds,
     mainStageId: main && mainPerfs.length ? main.id : null,
     mainLast,
+    headliners,
   };
 }
 
@@ -429,6 +452,64 @@ const isEarly = (d: RDay, p: RPerf) => p.mid < d.earlyEnd;
 const isLate = (d: RDay, p: RPerf) => p.mid >= d.lateStart;
 
 /* ───────────────────────────── 검증 ───────────────────────────── */
+
+export interface CloserCandidate {
+  festivalId: string;
+  date: string;
+  performanceId: string;
+  artistId: string;
+  stageId: string;
+  start: string;
+  /** 이미 `headliner: true`로 확인·표시됐는지 */
+  flagged: boolean;
+}
+
+function dayTimes(day: FestivalDay) {
+  return day.performances.map((p) => {
+    const start = parseTime(p.start);
+    let end = parseTime(p.end);
+    if (end <= start) end += 24 * 60;
+    return { p, start, end };
+  });
+}
+
+/**
+ * 데이터 입력용: 그날 마무리 공연(시작 시각이 가장 늦은 공연)이 메인 외 스테이지에 있는 날을 찾는다.
+ * 후보일 뿐이며, 공식 자료로 마무리·헤드라이너급 무대인지 확인한 뒤에만 `headliner: true`를 붙인다.
+ */
+export function findCloserCandidates(catalog: Catalog): CloserCandidate[] {
+  const out: CloserCandidate[] = [];
+  for (const f of catalog.festivals) {
+    const mainIds = new Set(f.stages.filter((s) => s.isMain).map((s) => s.id));
+    if (!mainIds.size) continue;
+    for (const d of f.days) {
+      const last = lastOf(dayTimes(d));
+      if (!last || mainIds.has(last.p.stageId)) continue;
+      out.push({ festivalId: f.id, date: d.date, performanceId: last.p.id, artistId: last.p.artistId, stageId: last.p.stageId, start: last.p.start, flagged: !!last.p.headliner });
+    }
+  }
+  return out;
+}
+
+/** 데이터 검증: `headliner` 표시가 정해진 범위(메인 외 스테이지의 그날 마무리 공연 1개)를 벗어나면 경고 */
+export function validateCatalog(catalog: Catalog): Issue[] {
+  const warnings: Issue[] = [];
+  for (const f of catalog.festivals) {
+    const mainIds = new Set(f.stages.filter((s) => s.isMain).map((s) => s.id));
+    for (const d of f.days) {
+      const times = dayTimes(d);
+      const last = lastOf(times);
+      const flagged = times.filter((t) => t.p.headliner);
+      const where = (t: (typeof times)[number]) => `${f.id} ${d.date} ${t.p.id}`;
+      if (flagged.length > 1) warnings.push({ code: 'HEADLINER_SCOPE', message: `${f.id} ${d.date}: headliner 표시 ${flagged.length}개 — 하루 1개(마무리 공연)만 표시해요` });
+      for (const t of flagged) {
+        if (mainIds.has(t.p.stageId)) warnings.push({ code: 'HEADLINER_SCOPE', message: `${where(t)}: 메인 스테이지 공연에는 표시하지 않아요 (메인 마지막 공연은 자동 포함)` });
+        else if (t !== last) warnings.push({ code: 'HEADLINER_SCOPE', message: `${where(t)}: 그날 시작 시각이 가장 늦은 공연이 아니에요` });
+      }
+    }
+  }
+  return warnings;
+}
 
 export function validateRecord(catalog: Catalog, record: UserRecord): { errors: Issue[]; warnings: Issue[] } {
   const errors: Issue[] = [];
@@ -468,7 +549,7 @@ const NAMES: Record<MetricId, string> = {
   festivals: '활동량',
   japan: '일본 선호',
   foreign: '해외 선호',
-  mainLast: '메인 마지막 공연 관람',
+  headliner: '헤드라이너 관람',
   mainPref: '메인 선호',
   subPref: '서브 선호',
   early: '초반 관람',
@@ -841,20 +922,22 @@ export function judge(catalog: Catalog, record: UserRecord, config: JudgeConfig 
     metrics.push(m);
   }
 
-  /* 9. 메인 마지막 공연 관람 — 공식 헤드라이너와 다를 수 있음 */
+  /* 9. 헤드라이너 관람 — 메인 스테이지 마지막 공연(자동) + 확인 후 표시한 비메인 마무리 공연.
+   *    하루에 헤드라이너가 둘이면 하나라도 본 날을 1일로 센다(둘 다 봐도 1일). 공식 헤드라이너와 다를 수 있음 */
   {
-    let m = blank('mainLast', 'base');
-    const judgeable = days.filter((d) => d.mainLast);
-    const seen = judgeable.filter((d) => d.views.some((v) => v.key === d.mainLast!.key));
+    let m = blank('headliner', 'base');
+    const judgeable = days.filter((d) => d.headliners.length);
+    const seenIn = (d: RDay) => d.headliners.filter((h) => d.views.some((v) => v.key === h.key));
+    const seen = judgeable.filter((d) => seenIn(d).length > 0);
     const k = seen.length;
     const n = judgeable.length;
-    const ml = T.mainLast;
+    const ml = T.headliner;
     m.unit = '일';
     m.numerator = k;
     m.denominator = n;
-    m.denominatorText = `판정 가능한 참가일 ${n}일 (메인 스테이지 마지막 공연이 특정되는 날)`;
+    m.denominatorText = `판정 가능한 참가일 ${n}일 (헤드라이너가 특정되는 날)`;
     m.tierRule = ml.map((t, i) => `${i + 1}단계 ${t.days}일↑·${t.rate}%↑`).join(' / ');
-    if (!n) m = exclude(m, '메인 스테이지가 특정되는 참가일 없음');
+    if (!n) m = exclude(m, '헤드라이너가 특정되는 참가일 없음 (메인 스테이지 미지정)');
     else {
       const rate = (k / n) * 100;
       m.value = k;
@@ -865,8 +948,11 @@ export function judge(catalog: Catalog, record: UserRecord, config: JudgeConfig 
       });
       m.tier = tier;
       if (k < ml[0].days) m.note = `본 날 ${k}일 < ${ml[0].days}일 (표본 조건: 하루 관람으로는 단계 없음)`;
-      m.evidence = k ? `메인 스테이지 마지막 공연을 ${n}일 중 ${k}일 봤어요` : null;
-      m.details = { perDay: judgeable.map((d) => ({ date: d.date, last: `${d.mainLast!.artist.name} ${fmtTime(d.mainLast!.start)}`, seen: seen.includes(d) })) };
+      m.evidence = k ? `헤드라이너 공연을 ${n}일 중 ${k}일 봤어요` : null;
+      const label = (h: RPerf) => `${h.artist.name} ${fmtTime(h.start)}${h.isMain ? '' : ` (${h.stageName})`}`;
+      m.details = {
+        perDay: judgeable.map((d) => ({ date: d.date, headliners: d.headliners.map(label), seenNames: seenIn(d).map(label), seen: seen.includes(d) })),
+      };
     }
     metrics.push(m);
   }
@@ -1043,7 +1129,8 @@ export function judge(catalog: Catalog, record: UserRecord, config: JudgeConfig 
       stageCount: d.stageIds.length,
       mainStageId: d.mainStageId,
       mainLastKey: d.mainLast?.key ?? null,
-      mainLastSeen: d.mainLast ? d.views.some((v) => v.key === d.mainLast!.key) : null,
+      headlinerKeys: d.headliners.map((h) => h.key),
+      headlinerSeen: d.headliners.length ? d.headliners.some((h) => d.views.some((v) => v.key === h.key)) : null,
       unionMin: unionLength(d.views.map((v) => [v.start, v.end] as Interval)),
       segments: segmentsByDay.get(d)!,
       clusters: cb.clusters,

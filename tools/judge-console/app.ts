@@ -1,4 +1,4 @@
-import { judge, fmtTime, fmtDuration, DEFAULT_CONFIG, METRIC_NAMES, VERSION } from '../../packages/judge/src/judge';
+import { judge, fmtTime, fmtDuration, DEFAULT_CONFIG, METRIC_NAMES, VERSION, validateCatalog } from '../../packages/judge/src/judge';
 import type { Catalog, JudgeResult, MetricResult, UserRecord, MetricId, DaySummary, Selection } from '../../packages/judge/src/judge';
 import { buildCases, GROUP_ORDER } from '../../packages/judge/src/fixtures';
 import type { Case } from '../../packages/judge/src/fixtures';
@@ -133,7 +133,8 @@ function renderMain() {
         .map(([k, v, s]) => `<div class="stat"><div class="stat-v mono">${v}</div><div class="stat-k">${k}</div><div class="stat-s">${s}</div></div>`)
         .join('')}
     </section>`);
-    if (r.warnings.length) html.push(`<div class="notice">${r.warnings.map((w) => esc(w.message)).join('<br>')}</div>`);
+    const warns = [...r.warnings, ...validateCatalog(c.catalog)];
+    if (warns.length) html.push(`<div class="notice">${warns.map((w) => esc(w.message)).join('<br>')}</div>`);
 
     /* 지표 표 */
     html.push(`<section><h2>지표별 계산</h2><div class="tbl-wrap"><table class="metrics">
@@ -194,7 +195,7 @@ function renderMain() {
       <tr><td>초반 / 후반 관람</td><td class="mono">Δ +${T.early.join(' / +')}%p</td><td>하루 일정 3등분, 공연 중간 시각 기준</td></tr>
       <tr><td>관람시간</td><td class="mono">${T.watchTime.join(' / ')}%</td><td>관람 3개↑인 날의 프로그램 대비 평균</td></tr>
       <tr><td>연속 관람</td><td class="mono">${T.streak.map(fmtDuration).join(' / ')}</td><td>공백 ≤ ${DEFAULT_CONFIG.streak.maxGapMin}분, 연결 구간 길이</td></tr>
-      <tr><td>메인 마지막 공연</td><td class="mono">${T.mainLast.map((t) => `${t.days}일·${t.rate}%`).join(' / ')}</td><td>본 날 수와 비율을 함께</td></tr>
+      <tr><td>헤드라이너 관람</td><td class="mono">${T.headliner.map((t) => `${t.days}일·${t.rate}%`).join(' / ')}</td><td>본 날 수와 비율을 함께 · 메인 마지막 + 확인 후 표시한 서브 마무리 공연, 하나라도 보면 1일</td></tr>
       <tr><td>동률 순서 (특별)</td><td colspan="2">${DEFAULT_CONFIG.order.special.map((id) => METRIC_NAMES[id]).join(' → ')}</td></tr>
       <tr><td>동률 순서 (기본)</td><td colspan="2">${DEFAULT_CONFIG.order.base.map((id) => METRIC_NAMES[id]).join(' → ')}</td></tr>
     </table></div></details></section>`);
@@ -253,7 +254,7 @@ function dayGrid(catalog: Catalog, festivalId: string, date: string, r: JudgeRes
   const w = (a: number, b: number) => `${((b - a) / L) * 100}%`;
   const selKey = (pid: string) => S.record.selections.find((s) => s.festivalId === festivalId && s.date === date && s.performanceId === pid);
   const summary: DaySummary | undefined = r.days.find((x) => x.festivalId === festivalId && x.date === date);
-  const mainLast = summary?.mainLastKey ?? null;
+  const headliners = new Set(summary?.headlinerKeys ?? []);
 
   const hours: number[] = [];
   for (let h = Math.ceil(t0 / 60) * 60; h <= t1; h += 60) hours.push(h);
@@ -273,7 +274,7 @@ function dayGrid(catalog: Catalog, festivalId: string, date: string, r: JudgeRes
           const sel = selKey(p.id);
           const key = `${festivalId}|${date}|${p.id}`;
           const a = catalog.artists[p.artistId];
-          const cls = ['blk', sel ? 'sel' : '', sel?.best ? 'best' : '', key === mainLast ? 'last' : '', a?.country === 'JP' ? 'jp' : a?.country === 'OTHER' ? 'fx' : ''].join(' ');
+          const cls = ['blk', sel ? 'sel' : '', sel?.best ? 'best' : '', headliners.has(key) ? 'last' : '', a?.country === 'JP' ? 'jp' : a?.country === 'OTHER' ? 'fx' : ''].join(' ');
           return `<button class="${cls}" style="left:${x(p.s)};width:${w(p.s, p.e)}" data-perf="${esc(festivalId)}|${esc(date)}|${esc(p.id)}" title="${esc(a?.name)} ${p.start}~${p.end} (${esc(stage.name)})" aria-pressed="${sel ? 'true' : 'false'}">
             <span class="b-name">${sel?.best ? '★ ' : ''}${esc(a?.shortName ?? a?.name ?? p.artistId)}</span><span class="b-time mono">${p.start}</span></button>`;
         })
@@ -330,7 +331,7 @@ function dayDiag(d: DaySummary) {
     <dl>
       <dt>프로그램</dt><dd class="mono">${fmtTime(d.programStart)}~${fmtTime(d.programEnd)} · 초반 ~${fmtTime(d.earlyEnd)} · 후반 ${fmtTime(d.lateStart)}~</dd>
       <dt>선택 공연 합집합</dt><dd>${fmtDuration(d.unionMin)} <span class="muted">(시간표 기준)</span></dd>
-      <dt>메인 마지막 공연</dt><dd>${d.mainLastSeen == null ? '특정 불가' : d.mainLastSeen ? '선택함' : '선택 안 함'}</dd>
+      <dt>헤드라이너</dt><dd>${d.headlinerSeen == null ? '특정 불가' : `${d.headlinerKeys.length}개 중 ${d.headlinerSeen ? '선택함' : '선택 안 함'}`}</dd>
       <dt>연결 구간</dt><dd>${segs.length ? segs.map((s) => `${fmtTime(s.start)}~${fmtTime(s.end)} 길이 ${fmtDuration(s.length)} / 공연 ${fmtDuration(s.inner)} / 공백 ${fmtDuration(s.gap)}${s.meals.length ? ` · ${s.meals.join('·')} 겹침` : ''}`).join('<br>') : '—'}</dd>
       <dt>무대 이동</dt><dd>순서 확정 이동 ${bc.m} · 확정 비이동 ${bc.s} · 불확정 경계 ${bc.u}${multi.length ? `<br>겹침 묶음 ${multi.length}개: ${multi.map((c) => `${fmtTime(c.start)}~${fmtTime(c.end)} 공연 ${c.perfKeys.length}·스테이지 ${c.stages.length} → 추정 최소 ${c.inferredMin}회`).join(', ')}` : ''}</dd>
     </dl>
