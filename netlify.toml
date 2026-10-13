@@ -1,0 +1,4 @@
+# 그민페 기록 수집 폼 (MIN-268) — Netlify 사이트 gmf2026-mylive
+[build]
+  command = "npm run build:form"
+  publish = "tools/gmf-form/dist"

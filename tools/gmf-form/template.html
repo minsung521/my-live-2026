@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>그민페 2026 기록</title>
+<meta name="description" content="그랜드 민트 페스티벌 2026에서 본 무대를 체크하면 나의 페스티벌 성향 카드를 보내드려요.">
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+:root {
+  --bg: #eef4f1;
+  --surface: #ffffff;
+  --ink: #14201b;
+  --muted: #5b6a65;
+  --line: #d4dfda;
+  --accent: #127a5f;
+  --accent-soft: #dcefe8;
+  --star: #c88a00;
+  --star-soft: #fbf0d3;
+  --bad: #b2352d;
+  --bad-soft: #f7e3e1;
+  --s0: #127a5f;
+  --s1: #6b4bb3;
+  --s2: #9a5a1a;
+  --font-body: "IBM Plex Sans KR", "Apple SD Gothic Neo", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --r: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1613; --surface: #17201c; --ink: #e3ece8; --muted: #93a39d; --line: #2a3632;
+    --accent: #5fcca8; --accent-soft: #163329; --star: #f0c04a; --star-soft: #3a2f10;
+    --bad: #ec7b70; --bad-soft: #3a1c1a; --s0: #5fcca8; --s1: #b29cf0; --s2: #e0a868; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1613; --surface: #17201c; --ink: #e3ece8; --muted: #93a39d; --line: #2a3632;
+  --accent: #5fcca8; --accent-soft: #163329; --star: #f0c04a; --star-soft: #3a2f10;
+  --bad: #ec7b70; --bad-soft: #3a1c1a; --s0: #5fcca8; --s1: #b29cf0; --s2: #e0a868; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.55; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+main { max-width: 560px; margin: 0 auto; padding: calc(20px + env(safe-area-inset-top, 0px)) 16px calc(112px + env(safe-area-inset-bottom, 0px)); }
+.intro h1 { font-size: 22px; line-height: 1.3; letter-spacing: -0.02em; margin: 6px 0 8px; }
+.kicker { margin: 0; color: var(--accent); font-weight: 600; font-size: 13px; letter-spacing: 0.02em; }
+.intro p { margin: 0 0 6px; color: var(--muted); }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; margin-top: 14px; }
+.card h2 { font-size: 17px; margin: 0 0 4px; letter-spacing: -0.01em; }
+.hint { margin: 0 0 10px; color: var(--muted); font-size: 13px; }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.chip { min-height: 44px; padding: 0 18px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); font-weight: 600; }
+.chip.on { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+.dayhead { position: sticky; top: 0; background: var(--surface); margin: 0 -16px; padding: 8px 16px; border-bottom: 1px solid var(--line); z-index: 1; }
+.tally { margin-top: 0; margin-bottom: 0; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tally .need { color: var(--star); }
+.list { list-style: none; margin: 0 -8px; padding: 0; }
+.row { display: flex; align-items: stretch; border-top: 1px solid var(--line); }
+.row:first-child { border-top: 0; }
+.pick { flex: 1; min-width: 0; display: grid; grid-template-columns: 22px auto minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 10px; align-items: center; text-align: left; background: none; border: 0; padding: 10px 8px; min-height: 56px; }
+.box { grid-row: 1 / 3; width: 22px; height: 22px; border-radius: 6px; border: 2px solid var(--line); }
+.row.on .box { background: var(--accent); border-color: var(--accent); box-shadow: inset 0 0 0 3px var(--surface); }
+.row.on { background: var(--accent-soft); }
+.time { font-size: 12px; color: var(--muted); grid-column: 2 / 4; }
+.name { grid-column: 2 / 3; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stage { grid-column: 3 / 4; justify-self: start; font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 999px; border: 1px solid currentColor; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.stage.s0 { color: var(--s0); } .stage.s1 { color: var(--s1); } .stage.s2 { color: var(--s2); }
+.star { width: 52px; flex: none; border: 0; background: none; font-size: 22px; color: var(--line); }
+.star:disabled { opacity: 0.35; cursor: default; }
+.row.on .star:not(.on) { color: var(--muted); }
+.star.on { color: var(--star); background: var(--star-soft); }
+label.field { display: block; font-weight: 600; margin-bottom: 6px; }
+input[type="text"] { width: 100%; min-height: 46px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); font-size: 16px; }
+.check { display: flex; gap: 10px; align-items: flex-start; margin-top: 12px; font-size: 14px; }
+.check input { width: 20px; height: 20px; margin: 2px 0 0; accent-color: var(--accent); flex: none; }
+.check small { display: block; color: var(--muted); }
+.fine { color: var(--muted); font-size: 12px; margin: 14px 2px 0; }
+#problems { list-style: none; margin: 14px 0 0; padding: 12px 14px; background: var(--bad-soft); color: var(--bad); border-radius: var(--r); font-size: 14px; font-weight: 500; }
+#problems li + li { margin-top: 4px; }
+.bar { position: fixed; left: 0; right: 0; bottom: 0; background: var(--surface); border-top: 1px solid var(--line); padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px)); z-index: 5; }
+.bar-in { max-width: 560px; margin: 0 auto; display: flex; gap: 12px; align-items: center; }
+#count { flex: 1; color: var(--muted); font-size: 13px; }
+#submit { min-height: 48px; padding: 0 22px; border: 0; border-radius: 999px; background: var(--accent); color: var(--surface); font-weight: 700; }
+#submit:disabled { opacity: 0.6; }
+#done { text-align: center; padding-top: 18vh; }
+#done h1 { font-size: 22px; margin: 0 0 10px; }
+#done p { color: var(--muted); margin: 0 0 6px; }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<!-- Netlify Forms가 배포 시 필드를 인식하도록 두는 정적 폼. 실제 제출은 화면의 스크립트가 같은 이름으로 보낸다. -->
+<form name="gmf-record" data-netlify="true" netlify-honeypot="bot-field" hidden>
+  <input name="anon_id"><input name="festival_id"><input name="days"><input name="selection_count">
+  <textarea name="record_json"></textarea><input name="form_version"><input name="submitted_at"><input name="bot-field">
+</form>
+<form name="gmf-contact" data-netlify="true" netlify-honeypot="bot-field" hidden>
+  <input name="anon_id"><input name="contact"><input name="consent_result"><input name="consent_reshare"><input name="submitted_at"><input name="bot-field">
+</form>
+
+<main>
+  <form id="form" novalidate>
+    <header class="intro">
+      <p class="kicker">GRAND MINT FESTIVAL 2026</p>
+      <h1>그민페에서 본 무대를 체크하면<br>나의 페스티벌 성향 카드를 보내드려요</h1>
+      <p>1~2분이면 끝나요. 하루씩 나눠 적어도 이 기기에 임시 저장돼요.</p>
+    </header>
+
+    <section class="card">
+      <h2>참가한 날</h2>
+      <p class="hint">이틀 다 왔다면 둘 다 눌러 주세요.</p>
+      <div class="chips" id="days"></div>
+    </section>
+
+    <div id="lists"></div>
+
+    <section class="card">
+      <h2>결과 받을 곳</h2>
+      <p class="hint">판정 결과 카드를 보내드릴 연락처예요. 남기지 않아도 기록은 보낼 수 있어요.</p>
+      <label class="field" for="contact">인스타 아이디 또는 이메일</label>
+      <input type="text" id="contact" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="@mylive 또는 me@example.com">
+      <label class="check"><input type="checkbox" id="consent-result"><span>결과 카드 전달을 위해 연락받는 데 동의해요<small>결과 전달에만 쓰고, 테스트가 끝나면 지워요.</small></span></label>
+      <label class="check"><input type="checkbox" id="consent-reshare"><span>(선택) 결과에 대한 짧은 피드백 요청도 받을게요<small>결과 전달 후 1~2번, 일주일 안에만 연락드려요.</small></span></label>
+    </section>
+
+    <ul id="problems" hidden></ul>
+    <p class="fine">기록은 이름 없이 무작위 ID로 저장해 판정 로직을 다듬는 데만 써요. 연락처는 기록과 따로 보관해요.</p>
+
+    <div class="bar"><div class="bar-in"><span id="count"></span><button type="submit" id="submit">기록 보내기</button></div></div>
+  </form>
+
+  <section id="done" hidden>
+    <h1>기록을 받았어요</h1>
+    <p id="done-contact"></p>
+    <p>남은 그민페도 즐겁게 보내세요.</p>
+  </section>
+</main>
+<script>/*__APP__*/</script>
+</body>
+</html>
