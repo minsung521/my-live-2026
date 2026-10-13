@@ -3,5 +3,8 @@
   "framework": null,
   "installCommand": "npm ci",
   "buildCommand": "npm run build:form",
-  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- tools/gmf-form data/gmf2026 packages/judge vercel.json package.json package-lock.json"
+  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- tools/gmf-form data/gmf2026 packages/judge vercel.json package.json package-lock.json",
+  "regions": [
+    "sin1"
+  ]
 }

@@ -5,6 +5,8 @@
  * 기록(gmf_records)과 연락처(gmf_contacts)는 익명 ID만 공유하는 별도 테이블이고,
  * 같은 기기에서 다시 제출하면 같은 익명 ID 행을 덮어쓴다.
  * DB 접속은 두 테이블에 INSERT/UPDATE만 허용한 전용 계정(GMF_DATABASE_URL)으로 한다.
+ * 그래서 upsert의 SET에 excluded.* 를 쓰지 않는다 — excluded 참조는 해당 열의 SELECT 권한을 요구해
+ * 전용 계정이 연락처를 읽을 수 있게 되기 때문. 같은 값을 매개변수로 다시 넘긴다.
  */
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { neon } from '@neondatabase/serverless';
@@ -30,15 +32,15 @@ export function neonStore(url: string): Store {
         sql`insert into gmf_records (anon_id, festival_id, form_version, record, selection_count, days, user_agent)
             values (${s.anonId}, ${s.festivalId}, ${s.formVersion}, ${JSON.stringify(s.record)}::jsonb, ${s.record.selections.length}, ${days}, ${userAgent})
             on conflict (anon_id) do update set
-              form_version = excluded.form_version, record = excluded.record, selection_count = excluded.selection_count,
-              days = excluded.days, user_agent = excluded.user_agent, updated_at = now(), submit_count = gmf_records.submit_count + 1`,
+              form_version = ${s.formVersion}, record = ${JSON.stringify(s.record)}::jsonb, selection_count = ${s.record.selections.length},
+              days = ${days}, user_agent = ${userAgent}, updated_at = now(), submit_count = gmf_records.submit_count + 1`,
       ];
       if (s.contact)
         queries.push(sql`insert into gmf_contacts (anon_id, contact, consent_result, consent_reshare)
             values (${s.anonId}, ${s.contact.value}, ${s.contact.consentResult}, ${s.contact.consentReshare})
             on conflict (anon_id) do update set
-              contact = excluded.contact, consent_result = excluded.consent_result,
-              consent_reshare = excluded.consent_reshare, updated_at = now()`);
+              contact = ${s.contact.value}, consent_result = ${s.contact.consentResult},
+              consent_reshare = ${s.contact.consentReshare}, updated_at = now()`);
       await sql.transaction(queries);
     },
   };
