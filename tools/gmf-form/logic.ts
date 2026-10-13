@@ -1,15 +1,17 @@
 /**
  * 그민페 기록 수집 폼 — 화면과 분리한 순수 로직 (MIN-268)
  *
- * 폼 상태 → 판정 모듈 `UserRecord` 변환, 제출 전 검사, Netlify Forms 전송 본문 생성.
- * 기록과 연락처는 익명 ID만 공유하는 별도 폼 두 개로 보낸다 (MIN-267 연락처 분리 보관).
+ * 폼 상태 → 판정 모듈 `UserRecord` 변환, 제출 전 검사, 전송 본문 생성, 서버 측 재검사.
+ * 기록과 연락처는 익명 ID만 공유하고 DB에서 별도 테이블에 저장한다 (MIN-267 연락처 분리 보관).
+ * 화면(app.ts)과 Vercel 함수(api/gmf-submit.ts)가 같은 검사를 쓴다.
  */
 import { validateRecord } from '../../packages/judge/src/judge';
 import type { Catalog, Festival, Performance, UserRecord } from '../../packages/judge/src/judge';
 
-export const FORM_VERSION = 'gmf-form v0.1';
-export const RECORD_FORM = 'gmf-record';
-export const CONTACT_FORM = 'gmf-contact';
+export const FORM_VERSION = 'gmf-form v0.2';
+export const SUBMIT_PATH = '/api/gmf-submit';
+export const ANON_ID_RE = /^g-[2-9A-HJ-NP-Z]{8}$/;
+export const CONTACT_MAX = 120;
 
 export interface FormState {
   /** 참가일 (YYYY-MM-DD) */
@@ -90,36 +92,60 @@ export function dayLabel(date: string): string {
   return `${m}/${d}(${w})`;
 }
 
-const enc = (o: Record<string, string>) =>
-  Object.entries(o)
-    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
-    .join('&');
+export interface Submission {
+  anonId: string;
+  festivalId: string;
+  formVersion: string;
+  record: UserRecord;
+  contact: { value: string; consentResult: boolean; consentReshare: boolean } | null;
+}
 
-/** Netlify Forms에 보낼 본문 두 개. 연락처가 없으면 연락처 폼은 보내지 않는다 */
-export function payloads(f: Festival, st: FormState, anonId: string, now: Date): { record: string; contact: string | null } {
-  const rec = toRecord(f, st);
-  const record = enc({
-    'form-name': RECORD_FORM,
-    anon_id: anonId,
-    festival_id: f.id,
-    days: [...st.days].sort().join(','),
-    selection_count: String(rec.selections.length),
-    record_json: JSON.stringify(rec),
-    form_version: FORM_VERSION,
-    submitted_at: now.toISOString(),
-    'bot-field': '',
-  });
+/** 전송 본문. 연락처가 비어 있으면 contact는 null */
+export function toSubmission(f: Festival, st: FormState, anonId: string): Submission {
   const c = st.contact.trim();
-  const contact = c
-    ? enc({
-        'form-name': CONTACT_FORM,
-        anon_id: anonId,
-        contact: c,
-        consent_result: st.consentResult ? 'yes' : 'no',
-        consent_reshare: st.consentReshare ? 'yes' : 'no',
-        submitted_at: now.toISOString(),
-        'bot-field': '',
-      })
-    : null;
-  return { record, contact };
+  return {
+    anonId,
+    festivalId: f.id,
+    formVersion: FORM_VERSION,
+    record: toRecord(f, st),
+    contact: c ? { value: c, consentResult: st.consentResult, consentReshare: st.consentReshare } : null,
+  };
+}
+
+/**
+ * 서버 측 재검사. 화면을 거치지 않은 요청도 여기서 걸러낸다.
+ * 통과하면 저장할 값만 추린 Submission을, 아니면 오류 메시지를 돌려준다.
+ */
+export function parseSubmission(catalog: Catalog, festivalId: string, body: unknown): { ok: true; value: Submission } | { ok: false; error: string } {
+  const fail = (error: string) => ({ ok: false as const, error });
+  if (!body || typeof body !== 'object') return fail('본문이 비어 있어요');
+  const b = body as Record<string, unknown>;
+  if (typeof b.anonId !== 'string' || !ANON_ID_RE.test(b.anonId)) return fail('익명 ID 형식이 올바르지 않아요');
+  if (b.festivalId !== festivalId) return fail('수집 대상 페스티벌이 아니에요');
+  const rec = b.record as Record<string, unknown> | undefined;
+  if (!rec || !Array.isArray(rec.selections) || rec.selections.length === 0 || rec.selections.length > 60) return fail('본 무대 기록이 올바르지 않아요');
+  const selections: UserRecord['selections'] = [];
+  const bestPerDay = new Map<string, number>();
+  for (const x of rec.selections as unknown[]) {
+    const s = x as Record<string, unknown>;
+    if (!s || s.festivalId !== festivalId || typeof s.date !== 'string' || typeof s.performanceId !== 'string') return fail('본 무대 기록 형식이 올바르지 않아요');
+    if (s.best !== undefined && s.best !== true) return fail('최고의 무대 표시가 올바르지 않아요');
+    if (s.best) bestPerDay.set(s.date, (bestPerDay.get(s.date) ?? 0) + 1);
+    selections.push(s.best ? { festivalId, date: s.date, performanceId: s.performanceId, best: true } : { festivalId, date: s.date, performanceId: s.performanceId });
+  }
+  const record: UserRecord = { selections };
+  const { errors } = validateRecord(catalog, record);
+  if (errors.length) return fail(errors[0].message);
+  const days = new Set(selections.map((s) => s.date));
+  for (const d of days) if (bestPerDay.get(d) !== 1) return fail(`${dayLabel(d)} 최고의 무대는 하나만 골라 주세요`);
+  let contact: Submission['contact'] = null;
+  if (b.contact !== null && b.contact !== undefined) {
+    const c = b.contact as Record<string, unknown>;
+    const value = typeof c.value === 'string' ? c.value.trim() : '';
+    if (!value || value.length > CONTACT_MAX) return fail('연락처가 올바르지 않아요');
+    if (c.consentResult !== true) return fail('결과를 받으려면 연락 동의에 체크해 주세요');
+    contact = { value, consentResult: true, consentReshare: c.consentReshare === true };
+  }
+  const formVersion = typeof b.formVersion === 'string' ? b.formVersion.slice(0, 40) : 'unknown';
+  return { ok: true, value: { anonId: b.anonId, festivalId, formVersion, record, contact } };
 }

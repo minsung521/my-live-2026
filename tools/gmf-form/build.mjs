@@ -1,10 +1,17 @@
+/**
+ * 폼 빌드.
+ * - tools/gmf-form/dist/index.html: 화면 (로컬 미리보기용)
+ * - .vercel/output: Vercel Build Output API v3 — 정적 화면 + POST /api/gmf-submit 함수 (esbuild로 한 파일로 묶음)
+ */
 import { build } from 'esbuild';
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const out = await build({
+const root = join(here, '../..');
+
+const client = await build({
   entryPoints: [join(here, 'app.ts')],
   bundle: true,
   minify: true,
@@ -13,8 +20,33 @@ const out = await build({
   write: false,
   legalComments: 'none',
 });
-const js = out.outputFiles[0].text.replace(/<\/script/gi, '<\\/script');
+const js = client.outputFiles[0].text.replace(/<\/script/gi, '<\\/script');
 const html = readFileSync(join(here, 'template.html'), 'utf8').replace('/*__APP__*/', () => js);
 mkdirSync(join(here, 'dist'), { recursive: true });
 writeFileSync(join(here, 'dist/index.html'), html);
 console.log(`tools/gmf-form/dist/index.html ${(html.length / 1024).toFixed(1)} KB`);
+
+const out = join(root, '.vercel/output');
+rmSync(out, { recursive: true, force: true });
+mkdirSync(join(out, 'static'), { recursive: true });
+writeFileSync(join(out, 'static/index.html'), html);
+writeFileSync(join(out, 'config.json'), JSON.stringify({ version: 3 }, null, 2));
+
+const fn = join(out, 'functions/api/gmf-submit.func');
+mkdirSync(fn, { recursive: true });
+await build({
+  entryPoints: [join(here, 'server.ts')],
+  bundle: true,
+  platform: 'node',
+  format: 'esm',
+  target: 'node22',
+  outfile: join(fn, 'index.mjs'),
+  legalComments: 'none',
+  // esm 번들 안에서 require를 쓰는 의존성 대비
+  banner: { js: "import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);" },
+});
+writeFileSync(
+  join(fn, '.vc-config.json'),
+  JSON.stringify({ runtime: 'nodejs22.x', handler: 'index.mjs', launcherType: 'Nodejs', shouldAddHelpers: false, regions: ['sin1'] }, null, 2),
+);
+console.log('.vercel/output (static + functions/api/gmf-submit.func)');

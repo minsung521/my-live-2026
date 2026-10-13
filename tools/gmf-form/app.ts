@@ -1,12 +1,14 @@
 import catalogJson from '../../data/gmf2026/catalog.json';
 import type { Catalog } from '../../packages/judge/src/judge';
-import { check, dayLabel, emptyState, makeAnonId, payloads, sortedDay } from './logic';
+import { ANON_ID_RE, SUBMIT_PATH, check, dayLabel, emptyState, makeAnonId, sortedDay, toSubmission } from './logic';
 import type { FormState } from './logic';
 
 const catalog = catalogJson as Catalog;
 const fest = catalog.festivals.find((f) => f.id === 'gmf2026')!;
 const stageIdx = new Map(fest.stages.map((s, i) => [s.id, i]));
 const DRAFT_KEY = 'gmf2026-form-draft';
+/** 같은 기기에서 다시 제출하면 같은 익명 ID로 덮어쓰도록 제출 후에도 남겨 둔다 */
+const ANON_KEY = 'gmf2026-anon-id';
 
 let st: FormState = emptyState();
 let anonId = makeAnonId();
@@ -14,19 +16,19 @@ let showProblems = false;
 let sending = false;
 
 try {
+  const saved = localStorage.getItem(ANON_KEY);
+  if (saved && ANON_ID_RE.test(saved)) anonId = saved;
+  else localStorage.setItem(ANON_KEY, anonId);
   const raw = localStorage.getItem(DRAFT_KEY);
   if (raw) {
     const d = JSON.parse(raw);
-    if (d && d.state && typeof d.anonId === 'string') {
-      st = { ...emptyState(), ...d.state };
-      anonId = d.anonId;
-    }
+    if (d && d.state) st = { ...emptyState(), ...d.state };
   }
 } catch {}
 
 function save() {
   try {
-    localStorage.setItem(DRAFT_KEY, JSON.stringify({ state: st, anonId }));
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({ state: st }));
   } catch {}
 }
 
@@ -125,9 +127,17 @@ document.addEventListener('input', (e) => {
   }
 });
 
-async function post(body: string) {
-  const res = await fetch('/', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+async function submit() {
+  const res = await fetch(SUBMIT_PATH, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(toSubmission(fest, st, anonId)),
+  });
+  let msg = '';
+  try {
+    msg = ((await res.json()) as { error?: string }).error ?? '';
+  } catch {}
+  if (!res.ok) throw new Error(msg || `HTTP ${res.status}`);
 }
 
 $('#form').addEventListener('submit', async (e) => {
@@ -141,23 +151,22 @@ $('#form').addEventListener('submit', async (e) => {
   }
   sending = true;
   render();
-  const { record, contact } = payloads(fest, st, anonId, new Date());
+  const hasContact = st.contact.trim() !== '';
   try {
-    await post(record);
-    if (contact) await post(contact);
+    await submit();
     try {
       localStorage.removeItem(DRAFT_KEY);
     } catch {}
     $('#form').hidden = true;
     $('#done').hidden = false;
-    $('#done-contact').textContent = contact ? '결과 카드는 적어 주신 연락처로 10/18부터 순서대로 보내드릴게요.' : '연락처를 남기지 않아 결과 카드는 따로 보내드리지 않아요. 기록은 판정 검증에만 써요.';
+    $('#done-contact').textContent = hasContact ? '결과 카드는 적어 주신 연락처로 10/18부터 순서대로 보내드릴게요.' : '연락처를 남기지 않아 결과 카드는 따로 보내드리지 않아요. 기록은 판정 검증에만 써요.';
     window.scrollTo({ top: 0 });
   } catch (err) {
     sending = false;
     render();
     const box = $('#problems');
     box.hidden = false;
-    box.innerHTML = `<li>전송에 실패했어요. 잠시 뒤 다시 눌러 주세요. 입력한 내용은 이 기기에 남아 있어요. (${esc(String((err as Error).message))})</li>`;
+    box.innerHTML = `<li>보내지 못했어요: ${esc(String((err as Error).message))}. 입력한 내용은 이 기기에 남아 있으니 잠시 뒤 다시 눌러 주세요.</li>`;
   }
 });
 

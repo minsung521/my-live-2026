@@ -8,7 +8,7 @@
 | --- | --- |
 | `packages/judge` | 성향 판정 로직(순수 함수, 의존성 없음) + 가상 사례 + 테스트 |
 | `tools/judge-console` | 판정 로직 내부 테스트 화면 |
-| `tools/gmf-form` | 그민페 2026 테스트 기록 수집 폼 (Netlify Forms, 사이트 `gmf2026-mylive`) |
+| `tools/gmf-form` | 그민페 2026 테스트 기록 수집 폼 + 저장 API (Vercel 프로젝트 `gmf2026-mylive`, Neon) |
 | `data/<행사>` | 수록 페스티벌 catalog + 대조 출처 (`npm test`가 표시 경고·판정 실행을 함께 검사) |
 | `app/` | 서비스 앱 (기술 스택 확정 후 추가) |
 
