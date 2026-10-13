@@ -2,3 +2,5 @@
 [build]
   command = "npm run build:form"
   publish = "tools/gmf-form/dist"
+  # 폼·그민페 데이터·배포 설정이 바뀐 커밋만 배포 (판정 로직·앱 작업은 폼을 다시 배포하지 않음)
+  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- tools/gmf-form data/gmf2026 netlify.toml package.json package-lock.json"
