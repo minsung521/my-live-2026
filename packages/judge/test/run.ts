@@ -1,5 +1,8 @@
 import { judge, tierFrom, unionLength, parseTime, DEFAULT_CONFIG, METRIC_NAMES, findCloserCandidates, validateCatalog } from '../src/judge';
 import type { Catalog } from '../src/judge';
+import { readdirSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { buildCases } from '../src/fixtures';
 
 let fail = 0;
@@ -46,6 +49,17 @@ ok(findCloserCandidates(hlCat({ s2: true }))[0]?.flagged === true, '표시 후 �
 ok(validateCatalog(hlCat({ s2: true })).length === 0, '서브 마무리 공연 표시는 경고 없음');
 ok(validateCatalog(hlCat({ m2: true })).some((w) => w.code === 'HEADLINER_SCOPE'), '메인 스테이지 공연 표시는 경고');
 ok(validateCatalog(hlCat({ s1: true })).some((w) => w.code === 'HEADLINER_SCOPE'), '마무리 공연이 아닌 공연 표시는 경고');
+
+/* 실데이터: data/<행사>/catalog.json — 표시 경고 0, 미확인 마무리 공연 후보 0, 판정 실행 */
+console.log('· 실데이터');
+const dataDir = join(dirname(fileURLToPath(import.meta.url)), '../../../data');
+for (const dir of readdirSync(dataDir)) {
+  const cat: Catalog = JSON.parse(readFileSync(join(dataDir, dir, 'catalog.json'), 'utf8'));
+  ok(validateCatalog(cat).length === 0, `${dir}: headliner 표시 경고 없음`);
+  ok(findCloserCandidates(cat).every((c) => c.flagged), `${dir}: 미확인 마무리 공연 후보 없음`);
+  const sel = cat.festivals.flatMap((f) => f.days.map((d) => ({ festivalId: f.id, date: d.date, performanceId: d.performances[0].id })));
+  ok(judge(cat, { selections: sel }).status === 'ok', `${dir}: 판정 실행`);
+}
 
 /* 가상 사례 */
 console.log('· 가상 사례');

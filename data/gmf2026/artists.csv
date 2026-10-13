@@ -1,0 +1,101 @@
+﻿artist_id,name,원본 표기(들),country,근거 요약,근거 URL,표기 통일 메모
+yeonjeong,연정,"연정
+YEONJEONG",KR,벅스 해당 아티스트 기본정보의 국적이 대한민국으로 명시됨.,https://music.bugs.co.kr/artist/20172528,한글 name은 공식 타임테이블 표기 유지. id는 원본 영문을 소문자 슬러그화.
+hi-fi-unicorn,하이파이유니콘,"하이파이유니콘
+Hi-Fi Un!corn",UNKNOWN,벅스는 대한민국으로 분류하지만 한일 멤버 구성도 명시. 공식 사이트는 FNC JAPAN 운영 및 한국·일본 활동 공지 병존. 단일 활동 기반 국가를 확정하지 못해 UNKNOWN.,"https://music.bugs.co.kr/artist/13322109
+https://www.hifiunicorn.com/
+https://www.hifiunicorn.com/profile",공식 타임테이블 한글 하이파이유니콘을 name으로 사용; !는 id에서 제거.
+jisokuryclub,지소쿠리클럽,"지소쿠리클럽
+jisokuryClub",KR,벅스 해당 아티스트 기본정보의 국적이 대한민국으로 명시됨.,https://music.bugs.co.kr/artist/20095116,원본 영문 jisokuryClub의 대문자 C를 전사표에 보존; id만 소문자화.
+jung-joonil,정준일,"정준일
+Jung Joonil",KR,벅스 해당 아티스트 기본정보의 국적이 대한민국으로 명시됨.,https://music.bugs.co.kr/artist/80061882,한글 name은 공식 타임테이블 표기 유지. id는 원본 영문을 소문자 슬러그화.
+jukjae,적재,"적재
+JUKJAE",KR,벅스 해당 아티스트 기본정보의 국적이 대한민국으로 명시됨.,https://music.bugs.co.kr/artist/8008787,한글 name은 공식 타임테이블 표기 유지. id는 원본 영문을 소문자 슬러그화.
+peppertones,페퍼톤스,"페퍼톤스
+PEPPERTONES",KR,벅스 해당 아티스트 기본정보의 국적이 대한민국으로 명시됨.,https://music.bugs.co.kr/artist/80000082,한글 name은 공식 타임테이블 표기 유지. id는 원본 영문을 소문자 슬러그화.
+chang-kiha,장기하,"장기하
+Chang Kiha",KR,벅스 해당 아티스트 기본정보의 국적이 대한민국으로 명시됨.,https://music.bugs.co.kr/artist/80049580,한글 name은 공식 타임테이블 표기 유지. id는 원본 영문을 소문자 슬러그화.
+lee-sora,이소라,"이소라
+LEE SORA",KR,벅스 해당 아티스트 기본정보의 국적이 대한민국으로 명시됨.,https://music.bugs.co.kr/artist/1915,종료 시각 미기재 — 원본 박스 길이로 추정한 종료 시각으로 catalog에 포함 (README 참고).
+futurepeerclub,퓨처피어클럽,"퓨처피어클럽
+FuturePeerClub",KR,벅스 해당 아티스트 기본정보의 국적이 대한민국으로 명시됨.,https://music.bugs.co.kr/artist/20233423,한글 name은 공식 타임테이블 표기 유지. id는 원본 영문을 소문자 슬러그화.
+leaveourtears,리브아워티어스,"리브아워티어스
+Leaveourtears",KR,벅스 해당 아티스트 기본정보의 국적이 대한민국으로 명시됨.,https://music.bugs.co.kr/artist/20220532,한글 name은 공식 타임테이블 표기 유지. id는 원본 영문을 소문자 슬러그화.
+owalloil,오월오일,"오월오일
+OWALLOIL",KR,벅스 해당 아티스트 기본정보의 국적이 대한민국으로 명시됨.,https://music.bugs.co.kr/artist/20089979,한글 name은 공식 타임테이블 표기 유지. id는 원본 영문을 소문자 슬러그화.
+lacuna,라쿠나,"라쿠나
+Lacuna",KR,벅스 해당 아티스트 기본정보의 국적이 대한민국으로 명시됨.,https://music.bugs.co.kr/artist/20071889,한글 name은 공식 타임테이블 표기 유지. id는 원본 영문을 소문자 슬러그화.
+car-the-garden,카더가든,"카더가든
+Car, the garden",KR,벅스 해당 아티스트 기본정보의 국적이 대한민국으로 명시됨.,https://music.bugs.co.kr/artist/80153142,"원본 Car, the garden의 쉼표·공백을 id에서 하이픈으로 정리."
+redoor,리도어,"리도어
+Redoor",KR,벅스 해당 아티스트 기본정보의 국적이 대한민국으로 명시됨.,https://music.bugs.co.kr/artist/20124179,한글 name은 공식 타임테이블 표기 유지. id는 원본 영문을 소문자 슬러그화.
+touched,터치드,"터치드
+TOUCHED",KR,벅스 해당 아티스트 기본정보의 국적이 대한민국으로 명시됨.,https://music.bugs.co.kr/artist/20121321,한글 name은 공식 타임테이블 표기 유지. id는 원본 영문을 소문자 슬러그화.
+lee-seung-yoon,이승윤,"이승윤
+LEE SEUNG YOON",KR,벅스 해당 아티스트 기본정보의 국적이 대한민국으로 명시됨. 소속 활동 알라리깡숑을 대조해 동명이인을 구분.,https://music.bugs.co.kr/artist/80115762,종료 시각 미기재 — 원본 박스 길이로 추정한 종료 시각으로 catalog에 포함 (README 참고).
+confined-white,컨파인드 화이트,"컨파인드 화이트
+Confined White",KR,벅스 해당 아티스트 기본정보의 국적이 대한민국으로 명시됨.,https://music.bugs.co.kr/artist/20123400,한글 name은 공식 타임테이블 표기 유지. id는 원본 영문을 소문자 슬러그화.
+love-is-cycle,러브이즈사이클,"러브이즈사이클
+love is cycle",KR,벅스 해당 아티스트 기본정보의 국적이 대한민국으로 명시됨.,https://music.bugs.co.kr/artist/20207952,한글 name은 공식 타임테이블 표기 유지. id는 원본 영문을 소문자 슬러그화.
+g0nny,거니,"거니
+g0nny",KR,벅스 해당 아티스트 기본정보의 국적이 대한민국으로 명시됨.,https://music.bugs.co.kr/artist/20118248,원본 g0nny의 숫자 0을 보존; Gunny 등 동명이인과 구별.
+sumin,수민,"수민
+SUMIN",KR,벅스 해당 아티스트 기본정보의 국적이 대한민국으로 명시됨.,https://music.bugs.co.kr/artist/20005865,한글 name은 공식 타임테이블 표기 유지. id는 원본 영문을 소문자 슬러그화.
+youra,유라,"유라
+youra",KR,벅스 해당 아티스트 기본정보의 국적이 대한민국으로 명시됨.,https://music.bugs.co.kr/artist/20059161,한글 name은 공식 타임테이블 표기 유지. id는 원본 영문을 소문자 슬러그화.
+aleph,알레프,"알레프
+ALEPH",KR,벅스 해당 아티스트 기본정보의 국적이 대한민국으로 명시됨.,https://music.bugs.co.kr/artist/20032640,한글 name은 공식 타임테이블 표기 유지. id는 원본 영문을 소문자 슬러그화.
+bye-bye-badman,바이 바이 배드맨,"바이 바이 배드맨
+Bye Bye Badman",KR,벅스 해당 아티스트 기본정보의 국적이 대한민국으로 명시됨.,https://music.bugs.co.kr/artist/80091248,한글 name은 공식 타임테이블 표기 유지. id는 원본 영문을 소문자 슬러그화.
+isaac-hong,홍이삭,"홍이삭
+ISAAC HONG",KR,벅스 해당 아티스트 기본정보의 국적이 대한민국으로 명시됨.,https://music.bugs.co.kr/artist/80193057,종료 시각 미기재 — 원본 박스 길이로 추정한 종료 시각으로 catalog에 포함 (README 참고).
+sanbo,산보,"산보
+Sanbo",KR,벅스 해당 아티스트 기본정보의 국적이 대한민국으로 명시됨.,https://music.bugs.co.kr/artist/20219259,한글 name은 공식 타임테이블 표기 유지. id는 원본 영문을 소문자 슬러그화.
+shin-in-ryu,신인류,"신인류
+Shin In Ryu",KR,벅스 해당 아티스트 기본정보의 국적이 대한민국으로 명시됨.,https://music.bugs.co.kr/artist/20066236,한글 name은 공식 타임테이블 표기 유지. id는 원본 영문을 소문자 슬러그화.
+dragon-pony,드래곤포니,"드래곤포니
+Dragon Pony",KR,벅스 해당 아티스트 기본정보의 국적이 대한민국으로 명시됨.,https://music.bugs.co.kr/artist/13686993,한글 name은 공식 타임테이블 표기 유지. id는 원본 영문을 소문자 슬러그화.
+bol4,볼빨간사춘기,"볼빨간사춘기
+BOL4",KR,벅스 해당 아티스트 기본정보의 국적이 대한민국으로 명시됨.,https://music.bugs.co.kr/artist/80210668,한글 name은 공식 타임테이블 표기 유지. id는 원본 영문을 소문자 슬러그화.
+jung-seung-hwan,정승환,"정승환
+Jung Seung Hwan",KR,벅스 해당 아티스트 기본정보의 국적이 대한민국으로 명시됨.,https://music.bugs.co.kr/artist/80213200,한글 name은 공식 타임테이블 표기 유지. id는 원본 영문을 소문자 슬러그화.
+roy-kim,로이킴,"로이킴
+Roy Kim",KR,벅스 해당 아티스트 기본정보의 국적이 대한민국으로 명시됨.,https://music.bugs.co.kr/artist/80137715,한글 name은 공식 타임테이블 표기 유지. id는 원본 영문을 소문자 슬러그화.
+cnblue,씨엔블루,"씨엔블루
+CNBLUE",KR,벅스 해당 아티스트 기본정보의 국적이 대한민국으로 명시됨.,https://music.bugs.co.kr/artist/80063207,한글 name은 공식 타임테이블 표기 유지. id는 원본 영문을 소문자 슬러그화.
+younha,윤하,"윤하
+YOUNHA",KR,벅스 해당 아티스트 기본정보의 국적이 대한민국으로 명시됨.,https://music.bugs.co.kr/artist/80010025,종료 시각 미기재 — 원본 박스 길이로 추정한 종료 시각으로 catalog에 포함 (README 참고).
+kwacamolee,과카몰리,"과카몰리
+kwacamolee",KR,벅스 해당 아티스트 기본정보의 국적이 대한민국으로 명시됨. 과카(KWACA)·이훈·Moé로 구성된 팀이며 bright #15 참여 음반을 대조.,https://music.bugs.co.kr/artist/80415141,한글 name은 공식 타임테이블 표기 유지. id는 원본 영문을 소문자 슬러그화.
+lee-oh-wook,이오욱(LOW),"이오욱(LOW)
+Lee Oh Wook (LOW)",KR,벅스 해당 아티스트 기본정보의 국적이 대한민국으로 명시됨. 소속 활동에 LOW (로우)가 기재돼 출연자 이오욱(LOW)와 대조.,https://music.bugs.co.kr/artist/80411356,공식 원본 표기 이오욱(LOW) 유지. 괄호 별칭을 shortName으로 중복 추가하지 않음.
+onewe,원위,"원위
+ONEWE",KR,벅스 해당 아티스트 기본정보의 국적이 대한민국으로 명시됨.,https://music.bugs.co.kr/artist/80320974,한글 name은 공식 타임테이블 표기 유지. id는 원본 영문을 소문자 슬러그화.
+far-east-asian-tigers,극동아시아타이거즈,"극동아시아타이거즈
+Far East Asian Tigers",KR,벅스 해당 아티스트 기본정보의 국적이 대한민국으로 명시됨.,https://music.bugs.co.kr/artist/20105524,한글 name은 공식 타임테이블 표기 유지. id는 원본 영문을 소문자 슬러그화.
+the-solutions,솔루션스,"솔루션스
+THE SOLUTIONS",KR,벅스 해당 아티스트 기본정보의 국적이 대한민국으로 명시됨.,https://music.bugs.co.kr/artist/80128657,한글 name은 공식 타임테이블 표기 유지. id는 원본 영문을 소문자 슬러그화.
+n-flying,엔플라잉,"엔플라잉
+N.Flying",KR,벅스 해당 아티스트 기본정보의 국적이 대한민국으로 명시됨.,https://music.bugs.co.kr/artist/80230321,원본 N.Flying의 .을 id에서 -로 변환.
+thornapple,쏜애플,"쏜애플
+THORNAPPLE",KR,벅스 해당 아티스트 기본정보의 국적이 대한민국으로 명시됨.,https://music.bugs.co.kr/artist/80075665,한글 name은 공식 타임테이블 표기 유지. id는 원본 영문을 소문자 슬러그화.
+10cm-x-soran,십란(십센치X소란),"십란(십센치X소란)
+10CM x SORAN",KR,구성 아티스트 10CM 및 소란(SORAN)의 벅스 기본정보 국적이 각각 대한민국. 합동 무대 전체를 KR로 분류.,"https://music.bugs.co.kr/artist/80067149
+https://music.bugs.co.kr/artist/80076754",원본 합동 무대 표기를 유지한 단일 항목. 개별 10CM·SORAN 항목을 catalog에 추가하지 않음. 종료 시각 미기재 — 원본 박스 길이로 추정한 종료 시각으로 catalog에 포함 (README 참고).
+gugu,구구,"구구
+GuGu",KR,벅스 해당 아티스트 기본정보의 국적이 대한민국으로 명시됨. CJ문화재단 소개와 벅스의 99%+1% 이름 설명을 대조해 동명이인을 구분.,"https://music.bugs.co.kr/artist/20118183
+https://www.cjazit.org/support/tune-up/entry/76/30138?p=49",한글 name은 공식 타임테이블 표기 유지. id는 원본 영문을 소문자 슬러그화.
+tokai,토카이,"토카이
+Tokai",KR,벅스 해당 아티스트 기본정보의 국적이 대한민국으로 명시됨.,https://music.bugs.co.kr/artist/20228435,한글 name은 공식 타임테이블 표기 유지. id는 원본 영문을 소문자 슬러그화.
+rothy,로시,"로시
+Rothy",KR,벅스 해당 아티스트 기본정보의 국적이 대한민국으로 명시됨. 바이오그래피가 가수 Rothy 및 2017년 Stars 데뷔를 명시해 동명이인을 구분.,https://music.bugs.co.kr/artist/20046439,한글 name은 공식 타임테이블 표기 유지. id는 원본 영문을 소문자 슬러그화.
+nib-archive,닙아카이브,"닙아카이브
+nib.archive",KR,벅스 해당 아티스트 기본정보의 국적이 대한민국으로 명시됨.,https://music.bugs.co.kr/artist/20256344,원본 nib.archive의 .을 id에서 -로 변환.
+shin-ji-hoon,신지훈,"신지훈
+Shin Ji Hoon",KR,벅스 해당 아티스트 기본정보의 국적이 대한민국으로 명시됨.,https://music.bugs.co.kr/artist/80148311,한글 name은 공식 타임테이블 표기 유지. id는 원본 영문을 소문자 슬러그화.
+kachisan,까치산,"까치산
+KACHISAN",KR,벅스 해당 아티스트 기본정보의 국적이 대한민국으로 명시됨.,https://music.bugs.co.kr/artist/20178975,한글 name은 공식 타임테이블 표기 유지. id는 원본 영문을 소문자 슬러그화.
+sunwoojunga,선우정아,"선우정아
+sunwoojunga",KR,벅스 해당 아티스트 기본정보의 국적이 대한민국으로 명시됨.,https://music.bugs.co.kr/artist/80012738,한글 name은 공식 타임테이블 표기 유지. id는 원본 영문을 소문자 슬러그화.
+lee-souk-won,이석원,"이석원
+LEE SOUK WON",KR,벅스 해당 아티스트 기본정보의 국적이 대한민국으로 명시됨. 소속 활동 언니네 이발관을 대조해 동명이인을 구분.,https://music.bugs.co.kr/artist/8010224,종료 시각 미기재 — 원본 박스 길이로 추정한 종료 시각으로 catalog에 포함 (README 참고).
