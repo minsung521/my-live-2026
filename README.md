@@ -8,7 +8,7 @@
 | --- | --- |
 | `packages/judge` | 성향 판정 로직(순수 함수, 의존성 없음) + 가상 사례 + 테스트 |
 | `tools/judge-console` | 판정 로직 내부 테스트 화면 |
-| `tools/gmf-form` | 그민페 2026 테스트 기록 수집 폼 + 저장 API (Vercel 프로젝트 `gmf2026-mylive`, Neon) |
+| `tools/gmf-form` | 그민페 2026 테스트 기록 수집 폼(`/gmf`) + 저장 API(`/api/gmf-submit`) + PostHog 계측 |
 | `data/<행사>` | 수록 페스티벌 catalog + 대조 출처 (`npm test`가 표시 경고·판정 실행을 함께 검사) |
 | `app/` | 서비스 앱 (기술 스택 확정 후 추가) |
 
@@ -20,8 +20,32 @@ npm test               # 단위 테스트 + 가상 사례 28개 기대값 검사
 npm run typecheck
 npm run build:console  # tools/judge-console/dist/index.html 생성
 npm run test:form      # 기록 수집 폼 로직 검사
-npm run build:form     # tools/gmf-form/dist/index.html 생성
+npm run build:form     # tools/gmf-form/dist/index.html + .vercel/output 생성
 ```
+
+## 인프라
+
+그민페 테스트와 본 서비스를 한 곳에서 운영한다.
+
+| 서비스 | 이름 | 비고 |
+| --- | --- | --- |
+| Vercel | 프로젝트 `my-live-2026` (main 브랜치 자동 배포) | `/gmf` 폼, `/api/gmf-submit`, `/ingest/*` PostHog 프록시. 본 서비스 전까지 `/`는 `/gmf`로 임시 이동 |
+| Neon | 프로젝트 `my-live-2026` (싱가포르, Vercel 연동) | `gmf_records`·`gmf_contacts`. 앱은 INSERT/UPDATE만 가능한 `gmf_app` 계정(`GMF_DATABASE_URL`)으로 접속 |
+| PostHog | 프로젝트 `MY LIVE 2026` (US) | 슈퍼 속성 `surface`로 구분 (`gmf-test` / 본 서비스) |
+
+### 그민페 폼 이벤트
+
+| 이벤트 | 주요 속성 |
+| --- | --- |
+| `$pageview`, `$pageleave` | 자동 |
+| `gmf_day_toggled` | `date`, `on` |
+| `gmf_performance_toggled` | `date`, `performance_id`, `artist_id`, `stage_id`, `start`, `on`, `checked_count` |
+| `gmf_best_selected` | `date`, `performance_id`, `artist_id`, `stage_id` |
+| `gmf_submit_clicked` | `days`, `selection_count`, `has_contact`, `blocked`, `problem_steps` |
+| `gmf_submit_succeeded` | 위 요약 + `resubmit` (제출 성공 시 DB와 같은 익명 ID로 identify) |
+| `gmf_submit_failed` | 위 요약 + `error` |
+
+연락처는 어떤 이벤트에도 넣지 않는다.
 
 ## 판정 로직 v0.1.1
 
