@@ -5,9 +5,10 @@
  *  - resident(올림픽공원 거주자)는 판정 모듈에 없는 특별 칭호로, 충족하면 최우선
  *  - subPref는 추가 조건을 통과해야 후보가 되고, 한 스테이지에 몰렸으면 oneStage로 바꿔 노출
  *  - 판정 모듈의 특별 칭호(repeat·festivals·japan·foreign)와 moves·viewRate는 쓰지 않는다
+ *  - 같은 단계면 그민페 전용 순서(GMF_TITLE_ORDER)로 고른다
  * 라벨·근거 문구는 MIN-314에서 다시 정할 수 있게 상수로 모아 둔다.
  */
-import { DEFAULT_CONFIG, fmtTime, parseTime, unionIntervals } from '../../packages/judge/src/judge';
+import { DEFAULT_CONFIG, fmtDuration, fmtTime, parseTime, unionIntervals } from '../../packages/judge/src/judge';
 import type { Catalog, Festival, JudgeResult, MetricId, MetricResult, Segment, UserRecord } from '../../packages/judge/src/judge';
 
 export type TitleId = 'resident' | 'mainPref' | 'subPref' | 'oneStage' | 'early' | 'late' | 'watchTime' | 'streak' | 'headliner' | 'statsOnly';
@@ -51,6 +52,12 @@ export const TITLE_RULES = {
   subPref: { minTier: 2, maxMainShare: 0.2, minViews: 6 },
   oneStage: { minShare: 0.7, minDeltaPp: 35 },
 };
+
+/**
+ * 같은 단계일 때 대표를 고르는 그민페 전용 순서 (판정 모듈 DEFAULT_CONFIG.order.base와 별개).
+ * oneStage·subPref는 한 사람에게 둘 중 하나만 나오므로 같은 자리. resident는 이 순서와 무관하게 최우선
+ */
+export const GMF_TITLE_ORDER: TitleId[] = ['oneStage', 'subPref', 'mainPref', 'early', 'late', 'streak', 'watchTime', 'headliner'];
 
 export const EVIDENCE_MAX = 26;
 
@@ -218,7 +225,8 @@ function evidenceFor(id: TitleId, m: MetricResult | undefined, ctx: { f: Festiva
       return ctx.result.stats.validDays > 1 ? `하루 공연 시간의 평균 ${p}%를 채웠어요` : `하루 공연 시간의 ${p}%를 채웠어요`;
     }
     case 'streak':
-      return `${longestSegment(ctx.result)?.seg.count ?? 0}개 무대를 연달아 봤어요`;
+      // 연결 구간 길이(공백 포함, 분) — 2시간 / 45분 / 7시간 30분
+      return `${fmtDuration(longestSegment(ctx.result)?.seg.length ?? 0)} 동안 무대가 이어졌어요`;
     case 'headliner':
       return '이틀 모두 헤드라이너 무대를 봤어요';
     default:
@@ -233,7 +241,6 @@ export function pickTitle(catalog: Catalog, record: UserRecord, result: JudgeRes
   const ctx = { f, record, result };
 
   // 후보: 판정 모듈 기본 칭호 중 계산 가능·1단계 이상 (+ 그민페 추가 조건)
-  const order = DEFAULT_CONFIG.order.base;
   const cands: { id: TitleId; metric: MetricResult }[] = [];
   for (const m of result.metrics) {
     if (!BASE_IDS.includes(m.id) || m.mode !== 'active' || !m.computable || m.tier < 1) continue;
@@ -242,7 +249,7 @@ export function pickTitle(catalog: Catalog, record: UserRecord, result: JudgeRes
       cands.push({ id: oneStageOf(f, record, result) ? 'oneStage' : 'subPref', metric: m });
     } else cands.push({ id: m.id as TitleId, metric: m });
   }
-  cands.sort((a, b) => b.metric.tier - a.metric.tier || order.indexOf(a.metric.id) - order.indexOf(b.metric.id));
+  cands.sort((a, b) => b.metric.tier - a.metric.tier || GMF_TITLE_ORDER.indexOf(a.id) - GMF_TITLE_ORDER.indexOf(b.id));
 
   const make = (id: TitleId, tier: number, metric: MetricResult | undefined, others: TitleId[]): TitleResult => ({
     id,

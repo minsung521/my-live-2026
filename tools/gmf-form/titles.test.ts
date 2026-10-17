@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { judge } from '../../packages/judge/src/judge';
 import type { Catalog, UserRecord } from '../../packages/judge/src/judge';
-import { EVIDENCE_MAX, TITLE_LABELS, cardSummary, pickTitle, residentShare, streakSubline } from './titles';
+import { EVIDENCE_MAX, GMF_TITLE_ORDER, TITLE_LABELS, cardSummary, longestSegment, pickTitle, residentShare, streakSubline } from './titles';
 import type { TitleResult } from './titles';
 
 const catalog = JSON.parse(readFileSync(new URL('../../data/gmf2026/catalog.json', import.meta.url), 'utf8')) as Catalog;
@@ -92,22 +92,54 @@ console.log('· 시간대·헤드라이너');
   ok(hl.id === 'headliner' && hl.evidence === '이틀 모두 헤드라이너 무대를 봤어요', `양일 헤드라이너만 → headliner (${hl.id})`);
 }
 
+console.log('· 같은 단계 순서 (그민페 전용)');
+{
+  ok(GMF_TITLE_ORDER.join() === 'oneStage,subPref,mainPref,early,late,streak,watchTime,headliner', '순서 상수');
+  const mbs1 = all(D1, (id) => id.startsWith(MBS));
+  const r = rec({ [D1]: mbs1 });
+  const res = judge(catalog, r);
+  const tiers = Object.fromEntries(res.metrics.map((m) => [m.id, m.tier]));
+  const t = run('MBS 하루 종일 8개', r);
+  ok(tiers.mainPref === 3 && tiers.streak === 3 && t.id === 'mainPref' && t.others.includes('streak'), `같은 3단계면 mainPref가 streak보다 앞 (${t.id}, others ${t.others})`);
+  const cms = run('CMS 단일 (streak 없음)', rec({ [D1]: [CMS + '1250', CMS + '1440', CMS + '1710', CMS + '2000'], [D2]: [CMS + '1240', CMS + '1430', CMS + '1650', CMS + '1920'] }));
+  ok(cms.id === 'oneStage', `oneStage 유지 (${cms.id})`);
+}
+
 console.log('· streak');
 {
+  const t = run('24개 전부 체크 (하루)', rec({ [D1]: all(D1) }));
+  ok(t.id === 'streak' && t.evidence === '10시간 10분 동안 무대가 이어졌어요', `24개 전부 → streak 근거 (${t.id} / ${t.evidence})`);
+  ok(t.subline === '연정 · 컨파인드 화이트 · 이승윤 외 21팀', `보조 줄 그대로 (${t.subline})`);
+  const t2 = run('24개 전부 체크 (양일)', rec({ [D1]: all(D1), [D2]: all(D2) }));
+  ok(t2.id === 'resident', `양일 24개씩은 resident (${t2.id})`);
+
+  // 보조 줄 규칙 — 대표가 streak이 아니어도 streakSubline으로 확인
   const mbs1 = all(D1, (id) => id.startsWith(MBS));
-  const r = rec({ [D1]: mbs1 }, { [D1]: MBS + '1640' });
-  const t = run('MBS 하루 종일 (★ 적재)', r);
-  ok(t.id === 'streak' && t.evidence === '8개 무대를 연달아 봤어요', `streak (${t.evidence})`);
-  ok(t.subline === '연정 · 적재 · 이소라 외 5팀', `★가 구간 안 → 포함, 시작 시각 순 (${t.subline})`);
-  ok(streakSubline(catalog, r, judge(catalog, r), 2) === '연정 · 적재 외 6팀', '2팀으로 줄이면 ★·첫 공연');
-  const r2 = rec({ [D1]: mbs1 });
-  ok(run('MBS 하루 종일 (★ 첫 공연)', r2).subline === '연정 · 하이파이유니콘 · 이소라 외 5팀', '★가 첫 공연이면 다음 공연으로 채움');
-  const r3 = rec({ [D1]: [...mbs1, CMS + '1250'] }, { [D1]: CMS + '1250' });
-  ok(run('★가 구간 중간', r3).subline === '연정 · 퓨처피어클럽 · 이소라 외 6팀', '★가 구간 중간이면 시작 시각 순 가운데');
+  const sr = rec({ [D1]: mbs1 }, { [D1]: MBS + '1640' });
+  ok(streakSubline(catalog, sr, judge(catalog, sr)) === '연정 · 적재 · 이소라 외 5팀', '★가 구간 안 → 포함, 시작 시각 순');
+  ok(streakSubline(catalog, sr, judge(catalog, sr), 2) === '연정 · 적재 외 6팀', '2팀으로 줄이면 ★·첫 공연');
+  const sr2 = rec({ [D1]: mbs1 });
+  ok(streakSubline(catalog, sr2, judge(catalog, sr2)) === '연정 · 하이파이유니콘 · 이소라 외 5팀', '★가 첫 공연이면 다음 공연으로 채움');
+  const sr3 = rec({ [D1]: [...mbs1, CMS + '1250'] }, { [D1]: CMS + '1250' });
+  ok(streakSubline(catalog, sr3, judge(catalog, sr3)) === '연정 · 퓨처피어클럽 · 이소라 외 6팀', '★가 구간 중간이면 시작 시각 순 가운데');
   const r4 = rec({ [D2]: all(D2, (id) => id.startsWith(CMS)) }, { [D2]: CMS + '2050' });
   const t4 = run('CMS 하루 종일 (★ 십란)', r4);
+  ok(t4.id === 'streak' && t4.evidence === '9시간 50분 동안 무대가 이어졌어요', `CMS 하루 종일 → streak (${t4.id} / ${t4.evidence})`);
   ok(t4.subline?.includes('십란(십센치X소란)') && !/십란\(십센치X소란\)[가-힣]/.test(t4.subline ?? ''), `가장 긴 이름 그대로, 조사 없음 (${t4.subline})`);
   ok(!/→|->/.test(t4.subline ?? ''), '화살표 없음');
+}
+
+console.log('· streak 근거 시간 표기');
+{
+  // 실제 기록으로 만들기 어려운 경계는 judge 결과의 구간 길이만 바꿔 확인
+  const r = rec({ [D1]: all(D1) });
+  const res = judge(catalog, r);
+  const seg = longestSegment(res)!.seg;
+  for (const [len, want] of [[45, '45분 동안 무대가 이어졌어요'], [120, '2시간 동안 무대가 이어졌어요'], [450, '7시간 30분 동안 무대가 이어졌어요']] as const) {
+    seg.length = len;
+    const t = pickTitle(catalog, r, res);
+    ok(t.evidence === want, `${len}분 → ${t.evidence}`);
+  }
 }
 
 console.log('· statsOnly');
