@@ -153,6 +153,8 @@ function labelBlock(ctx: Ctx, s: string): Block {
 /** 칭호: 자동 줄바꿈, 최대 3줄, 넘치면 글자 크기 축소 */
 function titleBlock(ctx: Ctx, label: string, size: number): Block | null {
   ctx.font = font(400, size, CARD.font.display);
+  // 단어 중간에서 끊기는 크기는 쓰지 않는다 (더 줄인다)
+  if (label.split(' ').some((w) => ctx.measureText(w).width > INNER)) return null;
   const lines = wrap(ctx, label, INNER);
   if (lines.length > CARD.title.maxLines) return null;
   const lh = size * CARD.title.line;
