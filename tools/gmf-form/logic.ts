@@ -8,7 +8,7 @@
 import { validateRecord } from '../../packages/judge/src/judge';
 import type { Catalog, Festival, Performance, UserRecord } from '../../packages/judge/src/judge';
 
-export const FORM_VERSION = 'gmf-form v0.2';
+export const FORM_VERSION = 'gmf-form v0.3';
 export const SUBMIT_PATH = '/api/gmf-submit';
 export const ANON_ID_RE = /^g-[2-9A-HJ-NP-Z]{8}$/;
 export const CONTACT_MAX = 120;
@@ -77,8 +77,8 @@ export function check(catalog: Catalog, f: Festival, st: FormState): Problem[] {
     else if (!st.best[date] || !(st.seen[date] ?? []).includes(st.best[date]!)) out.push({ step: 'best', message: `${label} 최고의 무대를 골라 주세요` });
   }
   const contact = st.contact.trim();
-  if (contact && !st.consentResult) out.push({ step: 'contact', message: '결과를 받으려면 연락 동의에 체크해 주세요' });
-  if (!contact && (st.consentResult || st.consentReshare)) out.push({ step: 'contact', message: '연락받을 인스타 아이디나 이메일을 적어 주세요' });
+  if (contact && !st.consentResult) out.push({ step: 'contact', message: '연락처를 남기려면 연락 동의에 체크해 주세요' });
+  if (!contact && (st.consentResult || st.consentReshare)) out.push({ step: 'contact', message: '연락받을 인스타 아이디나 이메일을 적어 주세요 (연락처는 선택이에요)' });
   if (out.length === 0) {
     const { errors } = validateRecord(catalog, toRecord(f, st));
     for (const e of errors) out.push({ step: 'record', message: e.message });
