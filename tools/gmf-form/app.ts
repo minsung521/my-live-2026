@@ -1,9 +1,12 @@
 import catalogJson from '../../data/gmf2026/catalog.json';
 import type { Catalog } from '../../packages/judge/src/judge';
-import { ANON_ID_RE, SUBMIT_PATH, check, dayLabel, emptyState, makeAnonId, sortedDay, toSubmission } from './logic';
+import { validateRecord } from '../../packages/judge/src/judge';
+import type { UserRecord } from '../../packages/judge/src/judge';
+import { ANON_ID_RE, SUBMIT_PATH, check, dayLabel, emptyState, makeAnonId, sortedDay, toRecord, toSubmission } from './logic';
 import type { FormState } from './logic';
 import { FORM_VERSION } from './logic';
 import { identify, initAnalytics, track } from './analytics';
+import { showResult } from './result';
 
 const catalog = catalogJson as Catalog;
 const fest = catalog.festivals.find((f) => f.id === 'gmf2026')!;
@@ -12,6 +15,8 @@ const DRAFT_KEY = 'gmf2026-form-draft';
 /** 같은 기기에서 다시 제출하면 같은 익명 ID로 덮어쓰도록 제출 후에도 남겨 둔다 */
 const ANON_KEY = 'gmf2026-anon-id';
 const SUBMITTED_KEY = 'gmf2026-submitted';
+/** 새로고침해도 마지막 결과를 다시 보여주도록 마지막으로 제출에 성공한 기록을 남긴다 (연락처 없음) */
+const LAST_KEY = 'gmf2026-last-record';
 
 let st: FormState = emptyState();
 let anonId = makeAnonId();
@@ -90,7 +95,7 @@ function render() {
   $('#count').textContent = st.days.length ? `${st.days.length}일 · ${total}개 무대` : '참가일을 먼저 골라 주세요';
   const btn = $('#submit') as HTMLButtonElement;
   btn.disabled = sending;
-  btn.textContent = sending ? '보내는 중…' : '기록 보내기';
+  btn.textContent = sending ? '결과 만드는 중…' : '결과 보기';
 }
 
 document.addEventListener('click', (e) => {
@@ -176,7 +181,7 @@ $('#form').addEventListener('submit', async (e) => {
   }
   sending = true;
   render();
-  const hasContact = st.contact.trim() !== '';
+  let record: UserRecord;
   try {
     await submit();
     identify(anonId);
@@ -184,13 +189,12 @@ $('#form').addEventListener('submit', async (e) => {
     try {
       resubmit = localStorage.getItem(SUBMITTED_KEY) === '1';
       localStorage.setItem(SUBMITTED_KEY, '1');
-      localStorage.removeItem(DRAFT_KEY);
     } catch {}
     track('gmf_submit_succeeded', { ...summary(), resubmit });
-    $('#form').hidden = true;
-    $('#done').hidden = false;
-    $('#done-contact').textContent = hasContact ? '결과 카드는 적어 주신 연락처로 10/18부터 순서대로 보내드릴게요.' : '연락처를 남기지 않아 결과 카드는 따로 보내드리지 않아요. 기록은 판정 검증에만 써요.';
-    window.scrollTo({ top: 0 });
+    record = toRecord(fest, st);
+    try {
+      localStorage.setItem(LAST_KEY, JSON.stringify(record));
+    } catch {}
   } catch (err) {
     track('gmf_submit_failed', { ...summary(), error: String((err as Error).message).slice(0, 120) });
     sending = false;
@@ -198,8 +202,27 @@ $('#form').addEventListener('submit', async (e) => {
     const box = $('#problems');
     box.hidden = false;
     box.innerHTML = `<li>보내지 못했어요: ${esc(String((err as Error).message))}. 입력한 내용은 이 기기에 남아 있으니 잠시 뒤 다시 눌러 주세요.</li>`;
+    return;
   }
+  // 제출이 성공한 뒤에만 결과를 보여준다. 기록 고치기로 돌아왔을 때 입력이 남아 있도록 초안은 지우지 않는다
+  sending = false;
+  render();
+  await showResult(catalog, record, anonId, { restored: false, onEdit: render });
 });
+
+function lastRecord(): UserRecord | null {
+  try {
+    const raw = localStorage.getItem(LAST_KEY);
+    if (!raw) return null;
+    const r = JSON.parse(raw) as UserRecord;
+    if (!r || !Array.isArray(r.selections) || !r.selections.length || validateRecord(catalog, r).errors.length) return null;
+    return r;
+  } catch {
+    return null;
+  }
+}
 
 initAnalytics({ surface: 'gmf-test', festival_id: fest.id, form_version: FORM_VERSION });
 render();
+const last = lastRecord();
+if (last) void showResult(catalog, last, anonId, { restored: true, onEdit: render });

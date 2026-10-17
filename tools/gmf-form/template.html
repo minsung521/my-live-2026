@@ -4,11 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>그민페 2026 기록</title>
-<meta name="description" content="그랜드 민트 페스티벌 2026에서 본 무대를 체크하면 나의 페스티벌 성향 카드를 보내드려요.">
+<meta name="description" content="그랜드 민트 페스티벌 2026에서 본 무대를 체크해 제출하면 바로 나의 페스티벌 성향 카드를 만들어드려요.">
 <meta name="robots" content="noindex">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<!-- 결과 카드(canvas)용. 카드를 그리기 전에 document.fonts.load로 필요한 글자만 받는다 -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@400;500;700&display=swap">
 <style>
 :root {
   --bg: #eef4f1;
@@ -89,9 +91,25 @@ input[type="text"] { width: 100%; min-height: 46px; padding: 0 12px; border: 1px
 #count { flex: 1; color: var(--muted); font-size: 13px; }
 #submit { min-height: 48px; padding: 0 22px; border: 0; border-radius: 999px; background: var(--accent); color: var(--surface); font-weight: 700; white-space: nowrap; }
 #submit:disabled { opacity: 0.6; }
-#done { text-align: center; padding-top: 18vh; }
-#done h1 { font-size: 22px; margin: 0 0 10px; }
-#done p { color: var(--muted); margin: 0 0 6px; }
+.opt { color: var(--muted); font-size: 12px; font-weight: 500; }
+#result { padding-bottom: 24px; }
+.cardbox { margin: 14px auto 12px; max-width: 360px; aspect-ratio: 9 / 16; display: grid; place-items: center; background: #14110f; border-radius: 16px; overflow: hidden; }
+.cardbox .hint { color: #b9b2a5; margin: 0; }
+#card-img { display: block; width: 100%; height: auto; -webkit-touch-callout: default; }
+.primary, .ghost { min-height: 48px; padding: 0 22px; border-radius: 999px; font-weight: 700; }
+.primary { border: 0; background: var(--accent); color: var(--surface); }
+.primary:disabled { opacity: 0.45; cursor: default; }
+.ghost { border: 1px solid var(--line); background: var(--surface); }
+.wide { display: block; width: 100%; max-width: 360px; margin: 0 auto; }
+#edit { margin-top: 16px; }
+.center { text-align: center; margin-top: 8px; }
+.right { text-align: right; margin: 4px 0 0; }
+#fb .q { margin-top: 14px; }
+#fb .qt { margin: 0 0 8px; font-weight: 600; font-size: 14px; }
+.chip.sm { min-height: 40px; padding: 0 14px; font-size: 14px; font-weight: 500; }
+#fb textarea { width: 100%; margin-top: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); font: inherit; font-size: 16px; color: inherit; resize: vertical; }
+#fb .err { color: var(--bad); font-size: 14px; margin: 12px 0 0; }
+#fb-send { margin-top: 16px; max-width: none; }
 [hidden] { display: none !important; }
 </style>
 </head>
@@ -100,7 +118,7 @@ input[type="text"] { width: 100%; min-height: 46px; padding: 0 12px; border: 1px
   <form id="form" novalidate>
     <header class="intro">
       <p class="kicker">GRAND MINT FESTIVAL 2026</p>
-      <h1>그민페에서 본 무대를 체크하면<br>나의 페스티벌 성향 카드를 보내드려요</h1>
+      <h1>그민페에서 본 무대를 체크해 제출하면<br>바로 나의 페스티벌 성향 카드를 만들어드려요</h1>
       <p>1~2분이면 끝나요. 하루씩 나눠 적어도 이 기기에 임시 저장돼요.</p>
     </header>
 
@@ -113,24 +131,34 @@ input[type="text"] { width: 100%; min-height: 46px; padding: 0 12px; border: 1px
     <div id="lists"></div>
 
     <section class="card">
-      <h2>결과 받을 곳</h2>
-      <p class="hint">판정 결과 카드를 보내드릴 연락처예요. 남기지 않아도 기록은 보낼 수 있어요.</p>
+      <h2>피드백 연락처 <span class="opt">선택</span></h2>
+      <p class="hint">결과 카드는 제출하면 바로 나와요. 결과에 대해 짧게 여쭤봐도 괜찮다면 연락처를 남겨 주세요. 남기지 않아도 결과는 그대로 볼 수 있어요.</p>
       <label class="field" for="contact">인스타 아이디 또는 이메일</label>
       <input type="text" id="contact" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="@mylive 또는 me@example.com">
-      <label class="check"><input type="checkbox" id="consent-result"><span>결과 카드 전달을 위해 연락받는 데 동의해요<small>결과 전달에만 쓰고, 테스트가 끝나면 지워요.</small></span></label>
-      <label class="check"><input type="checkbox" id="consent-reshare"><span>(선택) 결과에 대한 짧은 피드백 요청도 받을게요<small>결과 전달 후 1~2번, 일주일 안에만 연락드려요.</small></span></label>
+      <label class="check"><input type="checkbox" id="consent-result"><span>남긴 연락처로 연락받는 데 동의해요<small>이 테스트 관련 연락에만 쓰고, 테스트가 끝나면 지워요.</small></span></label>
+      <label class="check"><input type="checkbox" id="consent-reshare"><span>(선택) 결과에 대한 짧은 피드백 요청도 받을게요<small>일주일 안에 1~2번만 연락드려요.</small></span></label>
     </section>
 
     <ul id="problems" hidden></ul>
     <p class="fine">기록은 이름 없이 무작위 ID로 저장해 판정 로직을 다듬는 데만 써요. 연락처는 기록과 따로 보관해요.</p>
 
-    <div class="bar"><div class="bar-in"><span id="count"></span><button type="submit" id="submit">기록 보내기</button></div></div>
+    <div class="bar"><div class="bar-in"><span id="count"></span><button type="submit" id="submit">결과 보기</button></div></div>
   </form>
 
-  <section id="done" hidden>
-    <h1>기록을 받았어요</h1>
-    <p id="done-contact"></p>
-    <p>남은 그민페도 즐겁게 보내세요.</p>
+  <section id="result" hidden>
+    <header class="intro">
+      <p class="kicker">GRAND MINT FESTIVAL 2026 · 비공식 테스트</p>
+      <h1>결과가 나왔어요</h1>
+    </header>
+    <div class="cardbox">
+      <p id="card-status" class="hint">카드를 만드는 중…</p>
+      <img id="card-img" alt="" width="1080" height="1920" hidden>
+    </div>
+    <button type="button" id="save" class="primary wide" disabled>이미지 저장/공유</button>
+    <p class="hint center">이미지를 길게 눌러 저장할 수 있어요</p>
+    <section class="card" id="fb" aria-live="polite"></section>
+    <button type="button" id="edit" class="ghost wide">기록 고치기</button>
+    <p class="fine">카드는 이 기기에서 바로 만들어요. 기록은 이름 없이 무작위 ID로 저장해 판정 로직을 다듬는 데만 써요.</p>
   </section>
 </main>
 <script>/*__APP__*/</script>

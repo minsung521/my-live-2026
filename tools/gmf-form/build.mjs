@@ -1,7 +1,7 @@
 /**
  * 폼 빌드.
  * - tools/gmf-form/dist/index.html: 화면 (로컬 미리보기용)
- * - .vercel/output: Vercel Build Output API v3 — 정적 화면 + POST /api/gmf-submit 함수 (esbuild로 한 파일로 묶음)
+ * - .vercel/output: Vercel Build Output API v3 — 정적 화면 + POST /api/gmf-submit·/api/gmf-feedback 함수 (esbuild로 한 파일씩 묶음)
  *
  * 경로 (Vercel 프로젝트 하나에서 그민페 테스트와 앞으로의 본 서비스를 함께 운영)
  * - /gmf          그민페 기록 수집 폼
@@ -46,21 +46,27 @@ const routes = [
 ];
 writeFileSync(join(out, 'config.json'), JSON.stringify({ version: 3, routes }, null, 2));
 
-const fn = join(out, 'functions/api/gmf-submit.func');
-mkdirSync(fn, { recursive: true });
-await build({
-  entryPoints: [join(here, 'server.ts')],
-  bundle: true,
-  platform: 'node',
-  format: 'esm',
-  target: 'node22',
-  outfile: join(fn, 'index.mjs'),
-  legalComments: 'none',
-  // esm 번들 안에서 require를 쓰는 의존성 대비
-  banner: { js: "import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);" },
-});
-writeFileSync(
-  join(fn, '.vc-config.json'),
-  JSON.stringify({ runtime: 'nodejs22.x', handler: 'index.mjs', launcherType: 'Nodejs', shouldAddHelpers: false, regions: ['sin1'] }, null, 2),
-);
-console.log('.vercel/output (/gmf + /api/gmf-submit + /ingest 프록시)');
+// 함수: 기록 저장(gmf-submit) + 피드백 저장(gmf-feedback). 같은 설정으로 한 파일씩 묶는다
+for (const [name, entry] of [
+  ['gmf-submit', 'server.ts'],
+  ['gmf-feedback', 'feedback-server.ts'],
+]) {
+  const fn = join(out, `functions/api/${name}.func`);
+  mkdirSync(fn, { recursive: true });
+  await build({
+    entryPoints: [join(here, entry)],
+    bundle: true,
+    platform: 'node',
+    format: 'esm',
+    target: 'node22',
+    outfile: join(fn, 'index.mjs'),
+    legalComments: 'none',
+    // esm 번들 안에서 require를 쓰는 의존성 대비
+    banner: { js: "import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);" },
+  });
+  writeFileSync(
+    join(fn, '.vc-config.json'),
+    JSON.stringify({ runtime: 'nodejs22.x', handler: 'index.mjs', launcherType: 'Nodejs', shouldAddHelpers: false, regions: ['sin1'] }, null, 2),
+  );
+}
+console.log('.vercel/output (/gmf + /api/gmf-submit + /api/gmf-feedback + /ingest 프록시)');
