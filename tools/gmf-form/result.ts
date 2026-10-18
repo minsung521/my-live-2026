@@ -216,42 +216,71 @@ function canShareFile(file: File | null): boolean {
   }
 }
 
-async function shareFile(file: File, button: 'save' | 'share') {
+/**
+ * 휴대폰·태블릿인지 (iPadOS는 Mac UA라 터치 포인트로 구분).
+ * PC 브라우저(Windows·Mac의 Chrome·Edge·Safari)도 Web Share가 있지만 OS 공유 창이 떠서 저장이 안 되거나 조용히 실패하므로 쓰지 않는다
+ */
+export function isMobile(ua: string, maxTouchPoints: number): boolean {
+  return /Android|iPhone|iPad|iPod|Mobi/i.test(ua) || (/Macintosh/.test(ua) && maxTouchPoints > 1);
+}
+const onMobile = () => isMobile(navigator.userAgent, navigator.maxTouchPoints || 0);
+
+/** Web Share로 파일 공유. 취소가 아닌 실패면 false (호출한 쪽이 다운로드로 넘어간다) */
+async function shareFile(file: File, button: 'save' | 'share'): Promise<boolean> {
   track('gmf_card_save_clicked', { method: 'share', button });
   try {
     await navigator.share({ files: [file] });
     track('gmf_card_share_result', { outcome: 'shared', button });
+    return true;
   } catch (e) {
-    track('gmf_card_share_result', { outcome: (e as Error).name === 'AbortError' ? 'cancelled' : 'error', button });
+    const cancelled = (e as Error).name === 'AbortError';
+    track('gmf_card_share_result', { outcome: cancelled ? 'cancelled' : 'error', button });
+    return cancelled;
   }
 }
 
-function download(dataUrl: string, button: 'save' | 'share') {
+/** PNG 파일 내려받기. 큰 data URL 대신 blob URL을 쓴다 (data URL 다운로드는 일부 브라우저에서 막힘) */
+function download(card: Rendered, button: 'save' | 'share') {
   track('gmf_card_save_clicked', { method: 'download', button });
+  const url = card.file ? URL.createObjectURL(card.file) : card.dataUrl;
   const a = document.createElement('a');
-  a.href = dataUrl;
+  a.href = url;
   a.download = FILE_NAME;
   document.body.appendChild(a);
   a.click();
   a.remove();
+  if (card.file) setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
 
-/** 이미지 저장 — 인앱 브라우저면 길게 눌러 저장 안내, 아니면 PR #1 그대로 (Web Share 파일 → 다운로드) */
+/**
+ * 이미지 저장
+ *  - 인앱 브라우저: 길게 눌러 저장 안내
+ *  - 휴대폰: Web Share 파일(사진에 저장) → 실패하면 다운로드
+ *  - PC: 바로 PNG 다운로드
+ */
 async function saveCard() {
   const card = shown?.card;
   if (!card) return;
   if (isInApp(navigator.userAgent)) return openInAppGuide();
-  if (card.file && canShareFile(card.file)) return shareFile(card.file, 'save');
-  download(card.dataUrl, 'save');
+  if (onMobile() && card.file && canShareFile(card.file) && (await shareFile(card.file, 'save'))) return;
+  download(card, 'save');
 }
 
-/** 공유하기 — Web Share 파일 → (인앱이면 안내) → 다운로드 */
+/**
+ * 공유하기
+ *  - 휴대폰: Web Share 파일 → (인앱이면 안내) → 다운로드
+ *  - PC: 페이지 링크 복사 (카드 이미지는 [이미지 저장]으로)
+ */
 async function shareCard() {
   const card = shown?.card;
   if (!card) return;
-  if (card.file && canShareFile(card.file)) return shareFile(card.file, 'share');
+  if (!onMobile()) {
+    track('gmf_card_save_clicked', { method: 'link', button: 'share' });
+    return copyLink('링크를 복사했어요. 카드 이미지는 [이미지 저장]으로 받을 수 있어요');
+  }
+  if (card.file && canShareFile(card.file) && (await shareFile(card.file, 'share'))) return;
   if (isInApp(navigator.userAgent)) return openInAppGuide();
-  download(card.dataUrl, 'share');
+  download(card, 'share');
 }
 
 /* ───────── 시트·토스트 ───────── */
@@ -275,7 +304,7 @@ export function toast(msg: string) {
   t.textContent = msg;
   t.hidden = false;
   clearTimeout(toastTimer);
-  toastTimer = window.setTimeout(() => (t.hidden = true), 2200);
+  toastTimer = window.setTimeout(() => (t.hidden = true), Math.max(2200, msg.length * 80));
 }
 
 function openInAppGuide() {
@@ -288,7 +317,7 @@ function openInAppGuide() {
 <button type="button" class="btn accent wide" data-act="close">확인</button>`);
 }
 
-async function copyLink() {
+async function copyLink(done = '링크를 복사했어요') {
   const url = `${location.origin}${PAGE_PATH}`;
   let ok = false;
   try {
@@ -309,7 +338,7 @@ async function copyLink() {
   }
   if (ok) {
     track('gmf_link_copied');
-    toast('링크를 복사했어요');
+    toast(done);
   } else toast(url);
 }
 
