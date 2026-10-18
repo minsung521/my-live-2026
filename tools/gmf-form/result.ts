@@ -125,7 +125,7 @@ export async function showResult(catalog: Catalog, record: UserRecord, anonId: s
     }
   } catch {}
 
-  for (const id of ['#form', '#intro', '#grid', '#pick']) {
+  for (const id of ['#intro', '#grid', '#pick', '#progress', '#lsheet']) {
     const el = document.querySelector(id) as HTMLElement | null;
     if (el) el.hidden = true;
   }
@@ -194,6 +194,17 @@ function setActions(on: boolean) {
   for (const id of ['#save', '#share', '#photo-btn']) ($(id) as HTMLButtonElement).disabled = !on;
 }
 
+/** S1 소개의 예시 카드 — 같은 카드 코드로 예시 기록을 그린다 */
+export async function exampleCard(catalog: Catalog, record: UserRecord, pick: Pick | null): Promise<string> {
+  const result = judge(catalog, record);
+  const title = pickTitle(catalog, record, result, pick);
+  const input: CardInput = { title, sublineShort: null, summary: cardSummary(catalog, record, result, pick) };
+  const [, glyphs] = await Promise.all([loadCardFonts(input), loadGlyphs(input)]);
+  const canvas = document.createElement('canvas');
+  drawCard(canvas, input, glyphs);
+  return canvas.toDataURL('image/jpeg', 0.86);
+}
+
 /* ───────── 저장·공유 ───────── */
 
 function canShareFile(file: File | null): boolean {
@@ -259,7 +270,7 @@ function closeSheet() {
 }
 
 let toastTimer = 0;
-function toast(msg: string) {
+export function toast(msg: string) {
   const t = $('#toast');
   t.textContent = msg;
   t.hidden = false;
