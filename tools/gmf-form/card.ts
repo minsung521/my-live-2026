@@ -16,6 +16,12 @@ import { TITLE_COLORS } from './titles';
 /** PNG는 기기 픽셀 비율과 무관하게 1080×1920 */
 export const CARD_PX = { W: 1080, H: 1920 };
 
+/**
+ * 저장·공유 PNG는 스토리 구도: 카드 면(936×1520 기준으로 그린 모든 요소)을 이 비율로 줄여 캔버스 가운데에 둔다.
+ * 카드 면 안의 좌표는 그대로 두고 그릴 때 변환만 건다
+ */
+export const EXPORT_CARD_SCALE = 0.85;
+
 /** 정적 파일 경로 — build.mjs가 assets/glyphs를 /gmf/glyphs로 배포한다 */
 export const GLYPH_BASE = '/gmf/glyphs/';
 
@@ -68,6 +74,42 @@ export const CARD = {
   grain: { alpha: 0.12, seed: 20261018 },
   photo: { tint: 0.45, maxSide: 1600, shadowBlur: 18, shadowY: 2 },
 };
+
+/** PNG 안에서 카드 면 위치 (약 x 142 · y 314 · 796×1292) */
+export const EXPORT_FACE = {
+  x: (CARD_PX.W - CARD.face.w * EXPORT_CARD_SCALE) / 2,
+  y: (CARD_PX.H - CARD.face.h * EXPORT_CARD_SCALE) / 2,
+  w: CARD.face.w * EXPORT_CARD_SCALE,
+  h: CARD.face.h * EXPORT_CARD_SCALE,
+  r: CARD.face.r * EXPORT_CARD_SCALE,
+};
+
+/** 화면 표시용 자르기: 카드 면 경계보다 사방 12px(카드 면 기준) 넓게 — 손그림 테두리의 흔들림·두께가 다 들어가게 */
+export const SCREEN_CROP_PAD = 12;
+
+/** 화면에서 PNG를 카드 면만 크게 보여줄 때의 자르기 영역 (PNG 좌표). template.html의 --crop-* 값과 같아야 한다 (result.test.ts) */
+export function screenCrop() {
+  const pad = SCREEN_CROP_PAD * EXPORT_CARD_SCALE;
+  const x = EXPORT_FACE.x - pad;
+  const y = EXPORT_FACE.y - pad;
+  const w = EXPORT_FACE.w + pad * 2;
+  const h = EXPORT_FACE.h + pad * 2;
+  return {
+    x,
+    y,
+    w,
+    h,
+    /** CSS: 틀 비율, 틀 대비 이미지 폭·위치(%), 모서리(카드 면 모서리와 같은 중심의 둥근 틀) */
+    css: {
+      ar: `${w} / ${h}`,
+      width: (CARD_PX.W / w) * 100,
+      left: (-x / w) * 100,
+      top: (-y / h) * 100,
+      radiusX: ((EXPORT_FACE.r + pad) / w) * 100,
+      radiusY: ((EXPORT_FACE.r + pad) / h) * 100,
+    },
+  };
+}
 
 export const CARD_TEXT = {
   place: '올림픽공원',
@@ -230,9 +272,11 @@ function tint(img: HTMLImageElement, color: string): HTMLCanvasElement {
   return c;
 }
 
+let grainCanvas: HTMLCanvasElement | null = null;
 function grain(ctx: Ctx) {
   const { W, H } = CARD_PX;
-  const c = document.createElement('canvas');
+  if (grainCanvas) return drawGrain(ctx, grainCanvas);
+  const c = (grainCanvas = document.createElement('canvas'));
   // 반 해상도로 만들어 늘린다 (입자감 + 속도)
   c.width = W / 2;
   c.height = H / 2;
@@ -245,18 +289,28 @@ function grain(ctx: Ctx) {
     data.data[i + 3] = Math.floor(rand() * 255 * CARD.grain.alpha);
   }
   g.putImageData(data, 0, 0);
+  drawGrain(ctx, c);
+}
+
+function drawGrain(ctx: Ctx, c: HTMLCanvasElement) {
   ctx.save();
   ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(c, 0, 0, W, H);
+  ctx.drawImage(c, 0, 0, CARD_PX.W, CARD_PX.H);
   ctx.restore();
 }
 
 /* ───────── 영역 ───────── */
 
-function drawBackground(ctx: Ctx, d: CardInput) {
-  const f = CARD.face;
+/** 캔버스 배경 + 그레인 (카드 면 바깥) */
+function drawCanvas(ctx: Ctx) {
   ctx.fillStyle = CARD.color.canvas;
   ctx.fillRect(0, 0, CARD_PX.W, CARD_PX.H);
+  grain(ctx);
+}
+
+/** 카드 면: 면 색·사진·빛번짐·그레인 (카드 면 안으로 클립) */
+function drawFace(ctx: Ctx, d: CardInput) {
+  const f = CARD.face;
   ctx.save();
   roundRect(ctx, f.x, f.y, f.w, f.h, f.r);
   ctx.clip();
@@ -275,8 +329,8 @@ function drawBackground(ctx: Ctx, d: CardInput) {
   ctx.fillStyle = grad;
   ctx.fillRect(-gl.rx, -gl.rx, gl.rx * 2, gl.rx * 2);
   ctx.restore();
-  ctx.restore();
   grain(ctx);
+  ctx.restore();
 }
 
 function drawPhoto(ctx: Ctx, photo: CanvasImageSource & { width: number; height: number }) {
@@ -490,7 +544,13 @@ export function drawCard(canvas: HTMLCanvasElement, d: CardInput, glyphs: Map<st
   canvas.width = CARD_PX.W;
   canvas.height = CARD_PX.H;
   const ctx = canvas.getContext('2d')!;
-  drawBackground(ctx, d);
+  drawCanvas(ctx);
+  // 아래는 카드 면 기준 좌표 그대로 그리고, 변환으로 EXPORT_FACE 자리에 줄여 놓는다
+  ctx.save();
+  ctx.translate(EXPORT_FACE.x, EXPORT_FACE.y);
+  ctx.scale(EXPORT_CARD_SCALE, EXPORT_CARD_SCALE);
+  ctx.translate(-CARD.face.x, -CARD.face.y);
+  drawFace(ctx, d);
   const f = CARD.face;
   sketchRect(ctx, f.x + CARD.outline.w / 2, f.y + CARD.outline.w / 2, f.w - CARD.outline.w, f.h - CARD.outline.w, f.r, CARD.outline.w, CARD.color.cream, 7);
   ctx.save();
@@ -504,6 +564,7 @@ export function drawCard(canvas: HTMLCanvasElement, d: CardInput, glyphs: Map<st
   drawTop(ctx, d);
   drawTitleBlock(ctx, d, glyphs, l);
   drawBottom(ctx, d, glyphs);
+  ctx.restore();
   ctx.restore();
   return { overflow: l.overflow };
 }
