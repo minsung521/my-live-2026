@@ -2,7 +2,7 @@
  * 그민페 칭호 매핑 (MIN-306) — 판정 모듈 결과 위에서 그민페용 대표 칭호 하나를 고르는 순수 함수
  *
  * 판정 모듈(packages/judge)은 고치지 않고, 그 결과(metrics·days)에 그민페 전용 조건만 덧씌운다.
- *  - resident(올림픽공원 거주자)는 판정 모듈에 없는 특별 칭호로, 충족하면 최우선
+ *  - resident(올림픽공원 거주민)는 판정 모듈에 없는 특별 칭호로, 충족하면 최우선
  *  - subPref는 추가 조건을 통과해야 후보가 되고, 한 스테이지에 몰렸으면 oneStage로 바꿔 노출
  *  - 판정 모듈의 특별 칭호(repeat·festivals·japan·foreign)와 moves·viewRate는 쓰지 않는다
  *  - 같은 단계면 그민페 전용 순서(GMF_TITLE_ORDER)로 고른다
@@ -36,7 +36,7 @@ export interface TitleResult {
 
 /** 라벨 — 공동 후보 중 첫 번째. 교체는 여기서만 */
 export const TITLE_LABELS: Record<TitleId, string> = {
-  resident: '올림픽공원 거주자',
+  resident: '올림픽공원 거주민',
   mainPref: '메인스테이지 지박령',
   subPref: '메인스테이지는 거부한다',
   oneStage: '한 무대 지박령',

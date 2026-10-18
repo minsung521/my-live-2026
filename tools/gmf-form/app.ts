@@ -85,7 +85,7 @@ function showIntro() {
   window.scrollTo({ top: 0 });
   if (exampleDrawn) return;
   exampleDrawn = true;
-  // 예시 기록: 이틀 12무대씩 (올림픽공원 거주자) · 대표 십란
+  // 예시 기록: 이틀 12무대씩 (올림픽공원 거주민) · 대표 십란
   const D1 = ['mint-breeze-1220', 'mint-breeze-1320', 'mint-breeze-1420', 'mint-breeze-1530', 'mint-breeze-1640', 'mint-breeze-1750', 'mint-breeze-1910', 'mint-breeze-2040', 'club-midnight-sunset-1250', 'club-midnight-sunset-1830', 'club-midnight-sunset-2000', 'club-midnight-sunset-2130'];
   const D2 = ['mint-breeze-1220', 'mint-breeze-1310', 'mint-breeze-1410', 'mint-breeze-1520', 'mint-breeze-1630', 'mint-breeze-1740', 'club-midnight-sunset-1240', 'club-midnight-sunset-1330', 'club-midnight-sunset-1920', 'club-midnight-sunset-2050', 'loving-forest-garden-1850', 'loving-forest-garden-2020'];
   const [d1, d2] = fest.days.map((d) => d.date);
