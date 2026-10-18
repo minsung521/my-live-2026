@@ -46,7 +46,10 @@
 - **브랜치 이름**: `min-316-gmf-v2` 대신 `claude/new-session-iucst1` (세션 제약, 지시서의 대체 규칙대로)
 - **근거 위 간격**: 명세 24px를 따랐어요 (Figma는 28px)
 - **칭호 이미지 배율**: 줄 높이 160 = 글자 크기 160 기준(이미지 배율 0.8). Figma 인스턴스(폭 705)보다 약 2% 커요
-- **[공유하기]**: Web Share 파일 → (인앱이면 저장 안내 시트) → 다운로드. [이미지 저장]은 PR #1 그대로(Web Share 파일 → 다운로드), 인앱이면 안내 시트
+- **저장·공유 (PC/휴대폰 분기, `ddf5800`)**: PC 브라우저도 Web Share가 있어 OS 공유 창이 뜨고 저장이 안 되던 문제를 고쳤어요
+  - PC(Windows·Mac): [이미지 저장] = 바로 PNG 다운로드, [공유하기] = 페이지 링크 복사 + 토스트 `링크를 복사했어요. 카드 이미지는 [이미지 저장]으로 받을 수 있어요`
+  - 휴대폰: PR #1 그대로 Web Share 파일 → 실패(취소 제외)하면 다운로드. 인앱이면 저장 안내 시트
+  - 이벤트 `gmf_card_save_clicked`의 `method`에 `link` 추가
 - **화면 속 카드**: 1페이지·소개에서는 PNG의 바깥 여백(72·150px)을 잘라 카드 면만 보여줘요. 길게 눌러 저장하면 1080×1920 전체가 저장돼요
 - **v1 입력 코드 삭제**: 2단계가 v1 입력을 대체하므로 v1 FormState·폼 마크업을 지웠어요. '1단계만 공개'가 필요하면 `525ad41`로 되돌리면 돼요
 - **추가 이벤트(명세 밖, 진단용)**: `gmf_card_overflow`(위 덩어리가 120px로 줄여도 넘칠 때), `gmf_photo_failed`, `gmf_contact_failed`. `gmf_result_shown`에 `has_best`, `gmf_card_save_clicked`·`gmf_card_share_result`에 `button`(save/share) 속성 추가. 연락처 값은 어디에도 없음
