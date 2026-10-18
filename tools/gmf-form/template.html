@@ -81,6 +81,12 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .cell .ck { display: none; position: absolute; top: 5px; right: 5px; width: 20px; height: 20px; border-radius: 50%; background: #14110F; }
 .cell.on .ck { display: grid; place-items: center; }
 .cell .ck svg { width: 12px; height: 12px; }
+/* 우천 취소 공연: 위치·높이 그대로, 회색 면(크림 8%) + 흐린 이름 + 취소 태그 */
+.cell.canceled { background: rgba(242, 235, 221, 0.08); color: rgba(242, 235, 221, 0.35); cursor: default; }
+.cell.canceled .nm { padding-right: 34px; }
+.cell .cx { position: absolute; top: 5px; right: 5px; font-size: 10px; font-weight: 700; line-height: 1; padding: 3px 5px; border-radius: 999px;
+  border: 1px solid rgba(242, 235, 221, 0.35); color: rgba(242, 235, 221, 0.6); }
+.g-day .hint-canceled { margin: -6px 0 12px; font-size: 12px; color: var(--faint); }
 .g-bottom { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
   background: linear-gradient(to top, var(--bg) 70%, rgba(14, 12, 11, 0)); }
 .g-bottom .cta { max-width: 448px; margin: 0 auto; }

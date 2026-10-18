@@ -18,6 +18,18 @@ export const SUBMIT_PATH = '/api/gmf-submit';
 export const ANON_ID_RE = /^g-[2-9A-HJ-NP-Z]{8}$/;
 export const CONTACT_MAX = 120;
 export const REGRETS_MAX = 60;
+export const CANCELED_ERROR = '취소된 공연은 체크할 수 없어요';
+
+/** catalog 공연 + 그민페 전용 표시. 판정 모듈 타입은 고치지 않고 여기서 넓힌다 */
+export type GmfPerformance = Performance & {
+  /** 우천 등으로 취소된 공연. 판정(프로그램 길이·헤드라이너)을 위해 catalog에는 남겨 두고 체크만 막는다 */
+  canceled?: boolean;
+};
+
+export function isCanceled(f: Festival, date: string, performanceId: string): boolean {
+  const p = f.days.find((d) => d.date === date)?.performances.find((x) => x.id === performanceId) as GmfPerformance | undefined;
+  return !!p?.canceled;
+}
 
 export interface PerfRef {
   date: string;
@@ -63,23 +75,39 @@ export function sortedDay(f: Festival, date: string): Performance[] {
   return [...d.performances].sort((a, b) => a.start.localeCompare(b.start) || order.get(a.stageId)! - order.get(b.stageId)!);
 }
 
-/** 체크된 공연 키 (catalog에 있는 것만, 날짜·시작 시각 순) */
+/** 체크된 공연 키 (catalog에 있고 취소되지 않은 것만, 날짜·시작 시각 순) */
 export function checkedKeys(f: Festival, st: InputState): string[] {
   const out: string[] = [];
   for (const d of f.days) {
     const on = new Set(st.checked[d.date] ?? []);
-    for (const p of sortedDay(f, d.date)) if (on.has(p.id)) out.push(refKey(d.date, p.id));
+    for (const p of sortedDay(f, d.date)) if (on.has(p.id) && !(p as GmfPerformance).canceled) out.push(refKey(d.date, p.id));
   }
   return out;
 }
 
-/** 체크가 풀린 공연의 좋아요·아쉬움·대표를 정리하고, 한 공연에 좋아요·아쉬움 중 하나만 남긴다 */
+/**
+ * 체크가 풀린(또는 취소된) 공연의 좋아요·아쉬움·대표를 정리하고, 한 공연에 좋아요·아쉬움 중 하나만 남긴다.
+ * 예전 초안(localStorage)에 취소 공연 체크가 남아 있어도 여기서 빠진다
+ */
 export function normalize(f: Festival, st: InputState): InputState {
+  const checked: Record<string, string[]> = {};
+  for (const [date, ids] of Object.entries(st.checked)) checked[date] = ids.filter((id) => !isCanceled(f, date, id));
+  st = { ...st, checked };
   const valid = new Set(checkedKeys(f, st));
   const likes = [...new Set(st.likes)].filter((k) => valid.has(k));
   const regrets = [...new Set(st.regrets)].filter((k) => valid.has(k) && !likes.includes(k));
   const pick = st.pick && likes.includes(st.pick) ? st.pick : null;
   return { ...st, likes, regrets, pick };
+}
+
+/** 그리드 칸 탭: 체크/해제. 취소 공연은 무시하고 상태를 그대로 돌려준다 */
+export function toggleCheck(f: Festival, st: InputState, date: string, performanceId: string): { state: InputState; on: boolean; ignored: boolean } {
+  const cur = new Set(st.checked[date] ?? []);
+  if (isCanceled(f, date, performanceId)) return { state: st, on: cur.has(performanceId), ignored: true };
+  const on = !cur.has(performanceId);
+  if (on) cur.add(performanceId);
+  else cur.delete(performanceId);
+  return { state: normalize(f, { ...st, checked: { ...st.checked, [date]: [...cur] } }), on, ignored: false };
 }
 
 /** 대표 무대 기본값: 좋아요 중 가장 늦게 시작한 무대 (자정 넘김 없음 가정, 같은 시각이면 뒤 날짜) */
@@ -151,6 +179,7 @@ export function parseContactFields(
  */
 export function parseSubmission(catalog: Catalog, festivalId: string, body: unknown): { ok: true; value: Submission } | { ok: false; error: string } {
   const fail = (error: string) => ({ ok: false as const, error });
+  const isRef = (v: unknown): v is PerfRef => !!v && typeof v === 'object' && typeof (v as PerfRef).date === 'string' && typeof (v as PerfRef).performanceId === 'string';
   if (!body || typeof body !== 'object') return fail('본문이 비어 있어요');
   const b = body as Record<string, unknown>;
   if (typeof b.anonId !== 'string' || !ANON_ID_RE.test(b.anonId)) return fail('익명 ID 형식이 올바르지 않아요');
@@ -166,9 +195,11 @@ export function parseSubmission(catalog: Catalog, festivalId: string, body: unkn
   }
   const { errors } = validateRecord(catalog, { selections });
   if (errors.length) return fail(errors[0].message);
+  const fest = catalog.festivals.find((x) => x.id === festivalId);
+  const canceled = (r: unknown) => !!fest && isRef(r) && isCanceled(fest, r.date, r.performanceId);
+  if (selections.some(canceled) || (Array.isArray(rec.regrets) && rec.regrets.some(canceled)) || canceled(rec.pick)) return fail(CANCELED_ERROR);
   const picked = new Set(selections.map((s) => refKey(s.date, s.performanceId)));
   const liked = new Set(selections.filter((s) => s.best).map((s) => refKey(s.date, s.performanceId)));
-  const isRef = (v: unknown): v is PerfRef => !!v && typeof v === 'object' && typeof (v as PerfRef).date === 'string' && typeof (v as PerfRef).performanceId === 'string';
 
   // 아쉬움: 체크한 공연 안 · 좋아요가 아님 · 중복 제거 · 최대 60
   const regrets: PerfRef[] = [];

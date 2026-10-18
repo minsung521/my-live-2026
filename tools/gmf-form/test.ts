@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { judge, validateRecord } from '../../packages/judge/src/judge';
 import type { Catalog } from '../../packages/judge/src/judge';
-import { defaultPick, effectivePick, emptyInput, makeAnonId, normalize, parseSubmission, refKey, toRecord, toSubmission } from './logic';
+import { CANCELED_ERROR, checkedKeys, defaultPick, effectivePick, emptyInput, isCanceled, makeAnonId, normalize, parseSubmission, refKey, toRecord, toSubmission, toggleCheck } from './logic';
 import type { Submission } from './logic';
 import { handleSubmit } from './server';
 
@@ -89,6 +89,44 @@ bad((x) => (x.record.regrets = 'x'), '아쉬움이 배열 아님');
 bad((x) => (x.record.selections = Array(61).fill(x.record.selections[0])), '선택 61개');
 bad((x) => (x.contact = { value: '@a', consentResult: false }), '(v1 호환) 연락처 + 동의 없음');
 bad((x) => (x.contact = { value: 'a'.repeat(200), consentResult: true }), '(v1 호환) 너무 긴 연락처');
+
+console.log('· 2일차 우천 취소 공연');
+{
+  const CANCELED = ['mint-breeze-1520', 'mint-breeze-1630', 'mint-breeze-1740', 'mint-breeze-1900', 'mint-breeze-2030', 'loving-forest-garden-1530'];
+  ok(CANCELED.every((id) => isCanceled(f, d2, id)), 'catalog: 2일차 6개 canceled');
+  ok(f.days.flatMap((d) => d.performances).filter((p) => (p as { canceled?: boolean }).canceled).length === 6, 'canceled는 딱 6개 (1일차 LFG 15:30은 정상)');
+  ok(!isCanceled(f, d1, 'loving-forest-garden-1530') && f.days[1].performances.length === 24, '1일차 같은 ID는 정상, 2일차 공연은 지우지 않음(24개)');
+  ok(judge(catalog, { selections: [{ festivalId: f.id, date: d2, performanceId: 'club-midnight-sunset-2050' }] }).days[0].programEnd > 0, '판정 모듈은 그대로 동작');
+
+  // 그리드 탭 무시
+  const t1 = toggleCheck(f, emptyInput(), d2, 'mint-breeze-1900');
+  ok(t1.ignored && !t1.on && !(t1.state.checked[d2] ?? []).length, '그리드 탭 무시: 취소 공연은 체크 안 됨');
+  const t2 = toggleCheck(f, emptyInput(), d2, 'club-midnight-sunset-2050');
+  ok(!t2.ignored && t2.on && t2.state.checked[d2].includes('club-midnight-sunset-2050'), '정상 공연은 탭하면 체크');
+  ok(!toggleCheck(f, t2.state, d2, 'club-midnight-sunset-2050').on, '정상 공연 다시 탭하면 해제');
+
+  // 예전 초안에 남은 취소 공연 → 시트·대표 목록에서 빠짐
+  const stale = { ...emptyInput(), checked: { [d2]: ['mint-breeze-1900', 'club-midnight-sunset-2050', 'mint-breeze-2030'] }, likes: [refKey(d2, 'mint-breeze-1900'), refKey(d2, 'club-midnight-sunset-2050')], regrets: [refKey(d2, 'mint-breeze-2030')], pick: refKey(d2, 'mint-breeze-1900') };
+  const n2 = normalize(f, stale);
+  ok(checkedKeys(f, stale).join() === refKey(d2, 'club-midnight-sunset-2050'), '시트 목록(checkedKeys)에 취소 공연 없음');
+  ok(n2.checked[d2].join() === 'club-midnight-sunset-2050' && n2.likes.join() === refKey(d2, 'club-midnight-sunset-2050') && !n2.regrets.length && n2.pick === null, '예전 초안의 취소 공연 체크·좋아요·아쉬움·대표를 걸러냄');
+  const r2 = toRecord(f, stale);
+  ok(r2.selections.length === 1 && r2.pick?.performanceId === 'club-midnight-sunset-2050', '전송 기록에도 취소 공연 없음');
+
+  // 서버 재검사
+  const base2 = toSubmission(f, { ...emptyInput(), checked: { [d2]: ['club-midnight-sunset-2050', 'mint-breeze-1220'] }, likes: [refKey(d2, 'club-midnight-sunset-2050')], regrets: [refKey(d2, 'mint-breeze-1220')] }, id);
+  ok(parseSubmission(catalog, 'gmf2026', JSON.parse(JSON.stringify(base2))).ok, '정상 공연만 있으면 통과');
+  const rej = (mut: (x: any) => void, msg: string) => {
+    const x = JSON.parse(JSON.stringify(base2));
+    mut(x);
+    const r = parseSubmission(catalog, 'gmf2026', x);
+    ok(!r.ok && r.error === CANCELED_ERROR, `취소 공연 거절: ${msg}${r.ok ? '' : ` (${r.error})`}`);
+  };
+  rej((x) => x.record.selections.push({ festivalId: 'gmf2026', date: d2, performanceId: 'mint-breeze-1900' }), 'selections');
+  rej((x) => x.record.selections.push({ festivalId: 'gmf2026', date: d2, performanceId: 'loving-forest-garden-1530', best: true }), 'selections 좋아요');
+  rej((x) => x.record.regrets.push({ date: d2, performanceId: 'mint-breeze-2030' }), 'regrets');
+  rej((x) => (x.record.pick = { date: d2, performanceId: 'mint-breeze-1740' }), 'pick');
+}
 
 console.log('· 처리부');
 const saved: Submission[] = [];

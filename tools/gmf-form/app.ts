@@ -8,8 +8,8 @@ import catalogJson from '../../data/gmf2026/catalog.json';
 import type { Catalog, Performance } from '../../packages/judge/src/judge';
 import { validateRecord } from '../../packages/judge/src/judge';
 import type { UserRecord } from '../../packages/judge/src/judge';
-import { ANON_ID_RE, FORM_VERSION, SUBMIT_PATH, checkedKeys, dayLabel, effectivePick, emptyInput, makeAnonId, normalize, parseKey, toSubmission } from './logic';
-import type { GmfRecord, InputState } from './logic';
+import { ANON_ID_RE, FORM_VERSION, SUBMIT_PATH, checkedKeys, dayLabel, effectivePick, emptyInput, makeAnonId, normalize, parseKey, toSubmission, toggleCheck } from './logic';
+import type { GmfPerformance, GmfRecord, InputState } from './logic';
 import { identify, initAnalytics, track } from './analytics';
 import { exampleCard, showResult, toast } from './result';
 import { STAGE_SHORT } from './titles';
@@ -137,6 +137,9 @@ function renderGrid() {
             .map((p) => {
               const top = (mins(p.start) - t0) * PX_PER_MIN;
               const ht = (mins(p.end) - mins(p.start)) * PX_PER_MIN - 3;
+              // 취소 공연: 위치·높이 그대로, 회색 칸 + 취소 태그, 탭해도 체크되지 않음
+              if ((p as GmfPerformance).canceled)
+                return `<button type="button" class="cell canceled" style="top:${top}px;height:${ht}px" data-date="${d.date}" data-perf="${p.id}" aria-disabled="true" aria-label="${esc(artist(p))} ${p.start}–${p.end} ${STAGE_SHORT[p.stageId] ?? ''} 취소됨"><span class="nm">${esc(artist(p))}</span><span class="cx">취소</span></button>`;
               const c = on.has(p.id);
               return `<button type="button" class="cell s${stageIdx.get(p.stageId)}${c ? ' on' : ''}" style="top:${top}px;height:${ht}px" data-date="${d.date}" data-perf="${p.id}" aria-pressed="${c}" aria-label="${esc(artist(p))} ${p.start}–${p.end} ${STAGE_SHORT[p.stageId] ?? ''}"><span class="nm">${esc(artist(p))}</span><span class="ck">${check}</span></button>`;
             })
@@ -146,7 +149,7 @@ function renderGrid() {
         .join('');
       return `<section class="g-day" id="day-${d.date}" data-day="${d.date}">
   <h2>DAY ${i + 1} · ${dayLabel(d.date)}</h2>
-  <p class="hint">잠깐 들른 무대도, 시간이 겹치는 무대도 모두 체크해 주세요</p>
+  <p class="hint">잠깐 들른 무대도, 시간이 겹치는 무대도 모두 체크해 주세요</p>${ps.some((p) => (p as GmfPerformance).canceled) ? '\n  <p class="hint-canceled">비 때문에 취소된 무대는 체크할 수 없어요</p>' : ''}
   <div class="g-stages"><span></span>${fest.stages.map((s, j) => `<span><i style="background:${STAGE_COLOR[j]}"></i>${STAGE_SHORT[s.id] ?? s.name}</span>`).join('')}</div>
   <div class="g-body">
     <div class="g-lines">${hours.map((t) => `<i style="top:${(t - t0) * PX_PER_MIN}px"></i>`).join('')}</div>
@@ -161,12 +164,11 @@ function renderGrid() {
 
 function toggleCell(b: HTMLButtonElement) {
   const { date, perf: id } = b.dataset as { date: string; perf: string };
+  const t = toggleCheck(fest, st, date, id);
+  if (t.ignored) return; // 취소 공연
+  const on = t.on;
+  st = t.state;
   const cur = new Set(st.checked[date] ?? []);
-  const on = !cur.has(id);
-  if (on) cur.add(id);
-  else cur.delete(id);
-  st.checked[date] = [...cur];
-  st = normalize(fest, st);
   b.classList.toggle('on', on);
   b.setAttribute('aria-pressed', String(on));
   save();
