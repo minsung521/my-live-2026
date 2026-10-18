@@ -7,6 +7,7 @@ import type { FormState } from './logic';
 import { FORM_VERSION } from './logic';
 import { identify, initAnalytics, track } from './analytics';
 import { showResult } from './result';
+import type { Pick } from './titles';
 
 const catalog = catalogJson as Catalog;
 const fest = catalog.festivals.find((f) => f.id === 'gmf2026')!;
@@ -33,6 +34,8 @@ try {
     if (d && d.state) st = { ...emptyState(), ...d.state };
   }
 } catch {}
+// MIN-316: 연락처는 결과 2페이지(/api/gmf-contact)에서 받는다. 예전 초안에 남은 값은 버린다
+st = { ...st, contact: '', consentResult: false, consentReshare: false };
 
 function save() {
   try {
@@ -207,16 +210,19 @@ $('#form').addEventListener('submit', async (e) => {
   // 제출이 성공한 뒤에만 결과를 보여준다. 기록 고치기로 돌아왔을 때 입력이 남아 있도록 초안은 지우지 않는다
   sending = false;
   render();
-  await showResult(catalog, record, anonId, { restored: false, onEdit: render });
+  await showResult(catalog, record, anonId, { restored: false, onRestart: render });
 });
 
-function lastRecord(): UserRecord | null {
+/** 마지막 결과 — v2 기록은 { selections, regrets, pick }, v1 기록은 { selections } (pick 없음 → best로 최고 무대) */
+function lastRecord(): { record: UserRecord; pick?: Pick | null } | null {
   try {
     const raw = localStorage.getItem(LAST_KEY);
     if (!raw) return null;
-    const r = JSON.parse(raw) as UserRecord;
-    if (!r || !Array.isArray(r.selections) || !r.selections.length || validateRecord(catalog, r).errors.length) return null;
-    return r;
+    const r = JSON.parse(raw) as UserRecord & { pick?: Pick | null };
+    if (!r || !Array.isArray(r.selections) || !r.selections.length) return null;
+    const record: UserRecord = { selections: r.selections };
+    if (validateRecord(catalog, record).errors.length) return null;
+    return 'pick' in r ? { record, pick: r.pick ?? null } : { record };
   } catch {
     return null;
   }
@@ -225,4 +231,4 @@ function lastRecord(): UserRecord | null {
 initAnalytics({ surface: 'gmf-test', festival_id: fest.id, form_version: FORM_VERSION });
 render();
 const last = lastRecord();
-if (last) void showResult(catalog, last, anonId, { restored: true, onEdit: render });
+if (last) void showResult(catalog, last.record, anonId, { restored: true, pick: last.pick, onRestart: render });

@@ -9,7 +9,7 @@ import type { TitleId } from './titles';
 export const FEEDBACK_PATH = '/api/gmf-feedback';
 export const COMMENT_MAX = 300;
 
-export const TITLE_IDS: TitleId[] = ['resident', 'mainPref', 'subPref', 'oneStage', 'early', 'late', 'watchTime', 'streak', 'headliner', 'statsOnly'];
+export const TITLE_IDS: TitleId[] = ['resident', 'mainPref', 'subPref', 'oneStage', 'early', 'late', 'watchTime', 'streak', 'headliner', 'rookie'];
 
 export const FIT = [
   ['yes', '완전 나'],
@@ -31,6 +31,15 @@ export const SHOW_PARTS = [
   ['best', '최고의 무대'],
   ['stats', '숫자'],
 ] as const;
+/** 결과 2페이지 피드백 문항 (해요체) */
+export const QUESTIONS = {
+  fit: '이 칭호, 나랑 맞나요?',
+  understood: '왜 이 칭호인지 알겠나요?',
+  share: '스토리에 올릴 건가요?',
+  showParts: '(선택) 보여주고 싶은 것',
+  chips: '만든 사람에게 한마디',
+};
+
 export const CHIPS = [
   ['more', '이런 거 계속 만들어줘'],
   ['input_tedious', '입력이 좀 귀찮았어'],
@@ -53,10 +62,8 @@ export interface Feedback {
   judgeVersion: string;
   titleId: TitleId;
   titleLabel: string | null;
-  /** statsOnly면 null */
-  fit: Fit | null;
-  /** statsOnly면 null */
-  understood: Understood | null;
+  fit: Fit;
+  understood: Understood;
   share: Share;
   showParts: ShowPart[];
   chips: Chip[];
@@ -65,10 +72,9 @@ export interface Feedback {
 
 const keys = (list: readonly (readonly [string, string])[]) => list.map(([k]) => k);
 
-/** 필수 문항(1·2·3, statsOnly면 3)이 다 찼는지 — 화면의 [보내기] 활성화 기준 */
-export function feedbackReady(titleId: TitleId, fit: string | null, understood: string | null, share: string | null): boolean {
-  if (!share) return false;
-  return titleId === 'statsOnly' || (!!fit && !!understood);
+/** 필수 문항 1·2·3이 다 찼는지 — 화면의 [보내기] 활성화 기준 (rookie 포함 모든 칭호 같음) */
+export function feedbackReady(fit: string | null, understood: string | null, share: string | null): boolean {
+  return !!fit && !!understood && !!share;
 }
 
 /** 서버 측 재검사. 통과하면 저장할 값만 추린 Feedback을 돌려준다 */
@@ -80,15 +86,10 @@ export function parseFeedback(festivalId: string, body: unknown): { ok: true; va
   if (b.festivalId !== festivalId) return fail('수집 대상 페스티벌이 아니에요');
   if (typeof b.titleId !== 'string' || !TITLE_IDS.includes(b.titleId as TitleId)) return fail('칭호 값이 올바르지 않아요');
   const titleId = b.titleId as TitleId;
-  const statsOnly = titleId === 'statsOnly';
   const oneOf = (v: unknown, list: readonly (readonly [string, string])[]) => typeof v === 'string' && keys(list).includes(v);
-  if (statsOnly) {
-    if (b.fit != null || b.understood != null) return fail('통계 카드에는 칭호 문항이 없어요');
-  } else {
-    if (!oneOf(b.fit, FIT)) return fail('“이 칭호, 나 맞아?” 값이 올바르지 않아요');
-    if (!oneOf(b.understood, UNDERSTOOD)) return fail('“왜 이 칭호인지 알겠어?” 값이 올바르지 않아요');
-  }
-  if (!oneOf(b.share, SHARE)) return fail('“스토리에 올릴 거야?” 값이 올바르지 않아요');
+  if (!oneOf(b.fit, FIT)) return fail('“이 칭호, 나랑 맞나요?” 값이 올바르지 않아요');
+  if (!oneOf(b.understood, UNDERSTOOD)) return fail('“왜 이 칭호인지 알겠나요?” 값이 올바르지 않아요');
+  if (!oneOf(b.share, SHARE)) return fail('“스토리에 올릴 건가요?” 값이 올바르지 않아요');
   const list = <T extends string>(v: unknown, allowed: readonly (readonly [string, string])[], name: string): T[] | string => {
     if (v == null) return [];
     if (!Array.isArray(v) || v.length > 20) return `${name} 값이 올바르지 않아요`;
@@ -116,9 +117,9 @@ export function parseFeedback(festivalId: string, body: unknown): { ok: true; va
       formVersion: short(b.formVersion, 40) ?? 'unknown',
       judgeVersion: short(b.judgeVersion, 20) ?? 'unknown',
       titleId,
-      titleLabel: statsOnly ? null : short(b.titleLabel, 60),
-      fit: statsOnly ? null : (b.fit as Fit),
-      understood: statsOnly ? null : (b.understood as Understood),
+      titleLabel: short(b.titleLabel, 60),
+      fit: b.fit as Fit,
+      understood: b.understood as Understood,
       share: b.share as Share,
       showParts,
       chips,

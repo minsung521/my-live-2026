@@ -141,11 +141,22 @@ export function parseSubmission(catalog: Catalog, festivalId: string, body: unkn
   let contact: Submission['contact'] = null;
   if (b.contact !== null && b.contact !== undefined) {
     const c = b.contact as Record<string, unknown>;
-    const value = typeof c.value === 'string' ? c.value.trim() : '';
-    if (!value || value.length > CONTACT_MAX) return fail('연락처가 올바르지 않아요');
-    if (c.consentResult !== true) return fail('결과를 받으려면 연락 동의에 체크해 주세요');
-    contact = { value, consentResult: true, consentReshare: c.consentReshare === true };
+    const parsed = parseContactFields(c.value, c.consentResult, c.consentReshare);
+    if (!parsed.ok) return fail(parsed.error);
+    contact = parsed.value;
   }
   const formVersion = typeof b.formVersion === 'string' ? b.formVersion.slice(0, 40) : 'unknown';
   return { ok: true, value: { anonId: b.anonId, festivalId, formVersion, record, contact } };
+}
+
+/** 연락처 값·동의 검사 — 제출 본문(v1)과 결과 화면 연락처 API(gmf-contact)가 같이 쓴다 */
+export function parseContactFields(
+  rawValue: unknown,
+  consentResult: unknown,
+  consentReshare: unknown,
+): { ok: true; value: { value: string; consentResult: true; consentReshare: boolean } } | { ok: false; error: string } {
+  const value = typeof rawValue === 'string' ? rawValue.trim() : '';
+  if (!value || value.length > CONTACT_MAX) return { ok: false, error: '연락처가 올바르지 않아요' };
+  if (consentResult !== true) return { ok: false, error: '결과를 받으려면 연락 동의에 체크해 주세요' };
+  return { ok: true, value: { value, consentResult: true, consentReshare: consentReshare === true } };
 }

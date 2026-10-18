@@ -5,9 +5,9 @@
   "type": "module",
   "scripts": {
     "test": "tsx packages/judge/test/run.ts",
-    "typecheck": "tsc --noEmit --strict --skipLibCheck --target es2020 --lib es2020,dom --moduleResolution node --resolveJsonModule --esModuleInterop packages/judge/src/judge.ts packages/judge/src/fixtures.ts tools/judge-console/app.ts tools/gmf-form/app.ts tools/gmf-form/logic.ts tools/gmf-form/server.ts tools/gmf-form/analytics.ts tools/gmf-form/titles.ts tools/gmf-form/card.ts tools/gmf-form/result.ts tools/gmf-form/feedback.ts tools/gmf-form/feedback-server.ts",
+    "typecheck": "tsc --noEmit --strict --skipLibCheck --target es2020 --lib es2020,dom --moduleResolution node --resolveJsonModule --esModuleInterop packages/judge/src/judge.ts packages/judge/src/fixtures.ts tools/judge-console/app.ts tools/gmf-form/app.ts tools/gmf-form/logic.ts tools/gmf-form/server.ts tools/gmf-form/analytics.ts tools/gmf-form/titles.ts tools/gmf-form/card.ts tools/gmf-form/result.ts tools/gmf-form/feedback.ts tools/gmf-form/feedback-server.ts tools/gmf-form/contact-server.ts",
     "build:console": "node tools/judge-console/build.mjs",
-    "test:form": "tsx tools/gmf-form/test.ts && tsx tools/gmf-form/titles.test.ts && tsx tools/gmf-form/feedback.test.ts",
+    "test:form": "tsx tools/gmf-form/test.ts && tsx tools/gmf-form/titles.test.ts && tsx tools/gmf-form/feedback.test.ts && tsx tools/gmf-form/contact.test.ts",
     "build:form": "node tools/gmf-form/build.mjs"
   },
   "devDependencies": {

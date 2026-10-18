@@ -11,24 +11,31 @@
 import { DEFAULT_CONFIG, fmtDuration, fmtTime, parseTime, unionIntervals } from '../../packages/judge/src/judge';
 import type { Catalog, Festival, JudgeResult, MetricId, MetricResult, Segment, UserRecord } from '../../packages/judge/src/judge';
 
-export type TitleId = 'resident' | 'mainPref' | 'subPref' | 'oneStage' | 'early' | 'late' | 'watchTime' | 'streak' | 'headliner' | 'statsOnly';
+export type TitleId = 'resident' | 'mainPref' | 'subPref' | 'oneStage' | 'early' | 'late' | 'watchTime' | 'streak' | 'headliner' | 'rookie';
+
+export interface TitleItem {
+  id: TitleId;
+  label: string;
+  evidence: string;
+}
 
 export interface TitleResult {
   id: TitleId;
-  /** statsOnly면 null */
-  label: string | null;
-  /** 근거 한 줄 (목표 20자 안팎, 26자 이하) */
-  evidence: string | null;
+  label: string;
+  /** 근거 한 줄 (26자 이하, 해요체) */
+  evidence: string;
   /** 보조 줄 (streak의 공연 이름 등) */
   subline: string | null;
-  /** 대표 선정에 쓴 단계 (resident는 3, statsOnly는 0) */
+  /** 대표 선정에 쓴 단계 (resident는 3, rookie는 0) */
   tier: number;
-  /** 대표 외에 조건을 충족한 칭호 (카드엔 안 씀, 피드백·분석용) */
+  /** 대표 외에 조건을 충족한 칭호 (카드엔 개수만) */
   others: TitleId[];
+  /** 획득한 칭호 전부 (대표 먼저, 결과 2페이지 목록용) */
+  list: TitleItem[];
 }
 
 /** 라벨 — 공동 후보 중 첫 번째. 교체는 여기서만 */
-export const TITLE_LABELS: Record<Exclude<TitleId, 'statsOnly'>, string> = {
+export const TITLE_LABELS: Record<TitleId, string> = {
   resident: '올림픽공원 거주자',
   mainPref: '메인스테이지 지박령',
   subPref: '메인스테이지는 거부한다',
@@ -38,6 +45,21 @@ export const TITLE_LABELS: Record<Exclude<TitleId, 'statsOnly'>, string> = {
   watchTime: '고막 초과근무',
   streak: '화장실은 언제 가요?',
   headliner: '헤드라이너 절대 사수',
+  rookie: '그민페 신생아',
+};
+
+/** 성향색 — 칭호 글자·카드 빛번짐 (MIN-316) */
+export const TITLE_COLORS: Record<TitleId, string> = {
+  resident: '#84C030',
+  mainPref: '#00C89D',
+  subPref: '#FF7A93',
+  oneStage: '#FF8432',
+  early: '#D0A500',
+  late: '#60B0FF',
+  watchTime: '#00C0D7',
+  streak: '#E87CE0',
+  headliner: '#AA99FF',
+  rookie: '#F2EBDD',
 };
 
 export const STAGE_SHORT: Record<string, string> = {
@@ -168,22 +190,28 @@ export function longestSegment(result: JudgeResult): { date: string; seg: Segmen
   return best;
 }
 
+/** 대표 무대(★) — 2단계 기록의 pick. 2단계 전 기록(v1)은 undefined로 두고 best를 쓴다 */
+export interface Pick {
+  date: string;
+  performanceId: string;
+}
+
 /**
  * streak 보조 줄: 구간 안 공연 중 최대 maxTeams팀.
- * 우선순위 ① 구간 안의 최고 무대 ★ ② 구간 첫 공연 ③ 구간 마지막 공연, 겹치면 구간 안 다음 공연으로 채움.
+ * 우선순위 ① 구간 안의 대표 무대 ★ ② 구간 안의 좋아요 무대 ③ 구간 첫 공연 ④ 구간 마지막 공연, 겹치면 구간 안 다음 공연으로 채움.
  * 표시는 시작 시각 순, 구분자 ` · `, 남은 팀이 있으면 ` 외 {x}팀`
  */
-export function streakSubline(catalog: Catalog, record: UserRecord, result: JudgeResult, maxTeams = 3): string | null {
+export function streakSubline(catalog: Catalog, record: UserRecord, result: JudgeResult, maxTeams = 3, pick?: Pick | null): string | null {
   const f = festivalOf(catalog, record);
   const ls = longestSegment(result);
   if (!f || !ls) return null;
   const ids = ls.seg.perfKeys.map((k) => k.split('|')[2]);
-  const best = record.selections.find((s) => s.best && s.date === ls.date && ids.includes(s.performanceId))?.performanceId;
   const picked: string[] = [];
   const add = (id: string | undefined) => {
     if (id && !picked.includes(id) && picked.length < maxTeams) picked.push(id);
   };
-  add(best);
+  if (pick && pick.date === ls.date && ids.includes(pick.performanceId)) add(pick.performanceId);
+  for (const s of record.selections) if (s.best && s.date === ls.date && ids.includes(s.performanceId)) add(s.performanceId);
   add(ids[0]);
   add(ids[ids.length - 1]);
   for (const id of ids) add(id);
@@ -198,27 +226,27 @@ export function streakSubline(catalog: Catalog, record: UserRecord, result: Judg
   return names.join(' · ') + (rest > 0 ? ` 외 ${rest}팀` : '');
 }
 
-function evidenceFor(id: TitleId, m: MetricResult | undefined, ctx: { f: Festival; record: UserRecord; result: JudgeResult }): string | null {
+function evidenceFor(id: TitleId, m: MetricResult | undefined, ctx: { f: Festival; record: UserRecord; result: JudgeResult }): string {
   const n = m?.denominator ?? 0;
   const k = m?.numerator ?? 0;
   switch (id) {
     case 'resident':
       return `이틀 시간표의 ${Math.floor(residentShare(ctx.f, ctx.record, ctx.result).share * 100 + EPS)}%, 올림픽공원에 있었어요`;
     case 'mainPref':
-      return `본 무대 ${n}개 중 ${k}개가 메인 스테이지`;
+      return `본 무대 ${n}개 중 ${k}개가 메인 스테이지였어요`;
     case 'subPref': {
       const main = n - k;
-      return main === 0 ? '메인 스테이지 관람 0회' : `본 무대 ${n}개 중 메인은 ${main}개뿐`;
+      return main === 0 ? '메인 스테이지는 한 번도 안 갔어요' : `본 무대 ${n}개 중 메인은 ${main}개뿐이었어요`;
     }
     case 'oneStage': {
       const o = oneStageOf(ctx.f, ctx.record, ctx.result)!;
       const s = STAGE_SHORT[o.stageId] ?? o.stageId;
-      return o.k === o.n ? `${o.n}개 무대 전부 ${s}` : `본 무대 ${o.n}개 중 ${o.k}개가 ${s}`;
+      return o.k === o.n ? `${o.n}개 무대 모두 ${s}였어요` : `본 무대 ${o.n}개 중 ${o.k}개가 ${s}였어요`;
     }
     case 'early':
-      return `본 무대 ${n}개 중 ${k}개가 해 지기 전`;
+      return `본 무대 ${n}개 중 ${k}개가 해 지기 전이었어요`;
     case 'late':
-      return `본 무대 ${n}개 중 ${k}개가 해 진 뒤`;
+      return `본 무대 ${n}개 중 ${k}개가 해 진 뒤였어요`;
     case 'watchTime': {
       // metric 값은 프로그램 길이 대비 % (0~100). 단계 경계를 넘어 보이지 않게 내림
       const p = Math.floor((m?.value ?? 0) + EPS);
@@ -229,15 +257,25 @@ function evidenceFor(id: TitleId, m: MetricResult | undefined, ctx: { f: Festiva
       return `${fmtDuration(longestSegment(ctx.result)?.seg.length ?? 0)} 동안 무대가 이어졌어요`;
     case 'headliner':
       return '이틀 모두 헤드라이너 무대를 봤어요';
-    default:
-      return null;
+    case 'rookie':
+      return `${ctx.result.stats.views}개 무대를 봤어요. 내년엔 더 달려봐요`;
   }
 }
 
-export function pickTitle(catalog: Catalog, record: UserRecord, result: JudgeResult): TitleResult {
+export function pickTitle(catalog: Catalog, record: UserRecord, result: JudgeResult, pick?: Pick | null): TitleResult {
   const f = festivalOf(catalog, record);
-  const statsOnly: TitleResult = { id: 'statsOnly', label: null, evidence: null, subline: null, tier: 0, others: [] };
-  if (!f || result.status !== 'ok') return statsOnly;
+  const views = result.stats?.views ?? record.selections.length;
+  const rookie: TitleResult = {
+    id: 'rookie',
+    label: TITLE_LABELS.rookie,
+    evidence: `${views}개 무대를 봤어요. 내년엔 더 달려봐요`,
+    subline: null,
+    tier: 0,
+    others: [],
+    list: [],
+  };
+  rookie.list = [{ id: 'rookie', label: rookie.label, evidence: rookie.evidence }];
+  if (!f || result.status !== 'ok') return rookie;
   const ctx = { f, record, result };
 
   // 후보: 판정 모듈 기본 칭호 중 계산 가능·1단계 이상 (+ 그민페 추가 조건)
@@ -250,20 +288,20 @@ export function pickTitle(catalog: Catalog, record: UserRecord, result: JudgeRes
     } else cands.push({ id: m.id as TitleId, metric: m });
   }
   cands.sort((a, b) => b.metric.tier - a.metric.tier || GMF_TITLE_ORDER.indexOf(a.id) - GMF_TITLE_ORDER.indexOf(b.id));
+  const item = (id: TitleId, metric: MetricResult | undefined): TitleItem => ({ id, label: TITLE_LABELS[id], evidence: evidenceFor(id, metric, ctx) });
 
-  const make = (id: TitleId, tier: number, metric: MetricResult | undefined, others: TitleId[]): TitleResult => ({
-    id,
-    label: id === 'statsOnly' ? null : TITLE_LABELS[id],
-    evidence: evidenceFor(id, metric, ctx),
-    subline: id === 'streak' ? streakSubline(catalog, record, result) : null,
+  const make = (top: TitleItem, tier: number, rest: TitleItem[]): TitleResult => ({
+    ...top,
+    subline: top.id === 'streak' ? streakSubline(catalog, record, result, 3, pick) : null,
     tier,
-    others,
+    others: rest.map((r) => r.id),
+    list: [top, ...rest],
   });
 
-  if (residentShare(f, record, result).ok) return make('resident', 3, undefined, cands.map((c) => c.id));
-  if (!cands.length) return statsOnly;
+  if (residentShare(f, record, result).ok) return make(item('resident', undefined), 3, cands.map((c) => item(c.id, c.metric)));
+  if (!cands.length) return rookie;
   const [top, ...rest] = cands;
-  return make(top.id, top.metric.tier, top.metric, rest.map((c) => c.id));
+  return make(item(top.id, top.metric), top.metric.tier, rest.map((c) => item(c.id, c.metric)));
 }
 
 /* ───────────── 카드용 요약 (칭호와 무관한 공통 부분) ───────────── */
@@ -272,40 +310,67 @@ export interface BestStage {
   /** M/D */
   date: string;
   name: string;
-  /** 스테이지 이름 대문자 */
+  stageId: string;
+  /** MBS · CMS · LFG */
   stage: string;
   start: string;
 }
 
 export interface CardSummary {
+  /** 고른 공연 수 (ARTISTS) */
   views: number;
+  /** 고른 공연 시간 합집합 합계 (MINUTES) */
+  minutes: number;
+  /** 체크한 날 기준: 10.17—18 / 10.17 / 10.18 */
+  dateLabel: string;
   /** 페스티벌 스테이지 순서 그대로, 0 포함 */
   stages: { id: string; short: string; count: number }[];
-  /** 참가일 순서 */
-  best: BestStage[];
+  /** 이번 그민페 최고의 무대 — 대표 무대 1개 (없으면 null) */
+  best: BestStage | null;
 }
 
-export function cardSummary(catalog: Catalog, record: UserRecord, result: JudgeResult): CardSummary {
+/** 10.17—18 (이틀) / 10.17 (하루). 달이 다르면 10.31—11.1 */
+export function dateLabel(dates: string[]): string {
+  const ds = [...new Set(dates)].sort().map((d) => d.split('-').map(Number));
+  if (!ds.length) return '';
+  const [, m1, d1] = ds[0];
+  if (ds.length === 1) return `${m1}.${d1}`;
+  const [, m2, d2] = ds[ds.length - 1];
+  return m1 === m2 ? `${m1}.${d1}—${d2}` : `${m1}.${d1}—${m2}.${d2}`;
+}
+
+/**
+ * 카드 공통 요약.
+ * pick: 대표 무대 (2단계). undefined면 v1 기록으로 보고 best 중 마지막 참가일 것을 쓴다. null이면 최고 무대 없음
+ */
+export function cardSummary(catalog: Catalog, record: UserRecord, result: JudgeResult, pick?: Pick | null): CardSummary {
   const f = festivalOf(catalog, record);
-  if (!f) return { views: 0, stages: [], best: [] };
+  if (!f) return { views: 0, minutes: 0, dateLabel: '', stages: [], best: null };
   const byDate = viewsByDate(f, record);
   const all = [...byDate.values()].flat();
-  const best: BestStage[] = [];
-  for (const [date, views] of [...byDate].sort(([a], [b]) => a.localeCompare(b))) {
-    const b = views.find((v) => v.best);
-    if (!b) continue;
-    const p = f.days.find((d) => d.date === date)!.performances.find((x) => x.id === b.id)!;
-    const [, m, d] = date.split('-').map(Number);
-    best.push({
+  let chosen: Pick | null = pick ?? null;
+  if (pick === undefined) {
+    const last = [...byDate].sort(([a], [b]) => b.localeCompare(a)).find(([, views]) => views.some((v) => v.best));
+    if (last) chosen = { date: last[0], performanceId: last[1].find((v) => v.best)!.id };
+  }
+  let best: BestStage | null = null;
+  const v = chosen ? byDate.get(chosen.date)?.find((x) => x.id === chosen!.performanceId) : undefined;
+  if (chosen && v) {
+    const p = f.days.find((d) => d.date === chosen!.date)!.performances.find((x) => x.id === v.id)!;
+    const [, m, d] = chosen.date.split('-').map(Number);
+    best = {
       date: `${m}/${d}`,
       name: catalog.artists[p.artistId]?.name ?? p.artistId,
-      stage: (f.stages.find((s) => s.id === p.stageId)?.name ?? p.stageId).toUpperCase(),
-      start: fmtTime(b.start),
-    });
+      stageId: p.stageId,
+      stage: STAGE_SHORT[p.stageId] ?? p.stageId,
+      start: fmtTime(v.start),
+    };
   }
   return {
     views: result.stats.views,
-    stages: f.stages.map((s) => ({ id: s.id, short: STAGE_SHORT[s.id] ?? s.name, count: all.filter((v) => v.stageId === s.id).length })),
+    minutes: result.days.filter((d) => d.festivalId === f.id).reduce((s, d) => s + d.unionMin, 0),
+    dateLabel: dateLabel([...byDate.keys()]),
+    stages: f.stages.map((s) => ({ id: s.id, short: STAGE_SHORT[s.id] ?? s.name, count: all.filter((x) => x.stageId === s.id).length })),
     best,
   };
 }

@@ -31,8 +31,8 @@ if (good.ok) {
   ok(good.value.showParts.join() === 'title,best', `배열 중복 제거·허용 순서 (${good.value.showParts})`);
   ok(good.value.comment === '재밌어요', 'comment trim');
 }
-const so = parseFeedback('gmf2026', with_({ titleId: 'statsOnly', titleLabel: null, fit: null, understood: null }));
-ok(so.ok && so.value.fit === null && so.value.titleLabel === null, 'statsOnly + fit·understood null 통과');
+const rk = parseFeedback('gmf2026', with_({ titleId: 'rookie', titleLabel: '그민페 신생아' }));
+ok(rk.ok && rk.value.titleId === 'rookie' && rk.value.fit === 'yes', 'rookie 허용 (fit·understood 포함)');
 const blank = parseFeedback('gmf2026', with_({ comment: '   ' }));
 ok(blank.ok && blank.value.comment === null, '빈 comment → null');
 const c300 = parseFeedback('gmf2026', with_({ comment: '가'.repeat(300) }));
@@ -45,14 +45,16 @@ bad({ understood: undefined }, '칭호 카드인데 understood 없음');
 bad({ chips: ['more', 'free_text'] }, '허용 안 된 칩');
 bad({ showParts: 'title' }, 'showParts가 배열 아님');
 bad({ titleId: 'nomad' }, '없는 칭호');
-bad({ titleId: 'statsOnly', fit: 'yes', understood: null }, 'statsOnly인데 fit 있음');
+bad({ titleId: 'statsOnly' }, '없어진 statsOnly');
+bad({ titleId: 'rookie', fit: null }, 'rookie인데 fit 없음');
+bad({ titleId: 'rookie', understood: null }, 'rookie인데 understood 없음');
 bad({ comment: '가'.repeat(301) }, 'comment 301자');
 bad({ anonId: 'g-1234' }, '잘못된 anonId');
 bad({ anonId: 'g-7KQ2M9X0' }, 'anonId에 혼동 문자(0)');
 bad({ festivalId: 'other' }, '다른 페스티벌');
 
-ok(!feedbackReady('streak', 'yes', null, 'story') && feedbackReady('streak', 'yes', 'no', 'no'), '필수 문항 1·2·3');
-ok(feedbackReady('statsOnly', null, null, 'friends') && !feedbackReady('statsOnly', null, null, null), 'statsOnly는 3번만 필수');
+ok(!feedbackReady('yes', null, 'story') && feedbackReady('yes', 'no', 'no'), '필수 문항 1·2·3');
+ok(!feedbackReady(null, null, 'friends'), 'rookie도 1·2번 필수 (3번만으로는 안 됨)');
 
 const saved: Feedback[] = [];
 const store = { save: async (f: Feedback) => void saved.push(f) };
@@ -66,8 +68,8 @@ const r4 = await handleFeedback(JSON.stringify(with_({ comment: 'x'.repeat(301) 
 ok(r4.status === 400 && saved.length === 1, 'comment 301자 (400)');
 const r5 = await handleFeedback(JSON.stringify(with_({ anonId: 'nope' })), store);
 ok(r5.status === 400 && saved.length === 1, '잘못된 anonId (400)');
-const r6 = await handleFeedback(JSON.stringify(with_({ titleId: 'statsOnly', fit: 'yes' })), store);
-ok(r6.status === 400 && saved.length === 1, 'statsOnly인데 fit 있음 (400)');
+const r6 = await handleFeedback(JSON.stringify(with_({ titleId: 'rookie', fit: null })), store);
+ok(r6.status === 400 && saved.length === 1, 'rookie인데 fit 없음 (400)');
 const r7 = await handleFeedback(JSON.stringify(base), { save: async () => { throw new Error('db down'); } });
 ok(r7.status === 500, 'DB 오류는 500');
 ok(!('contact' in saved[0]), '저장 값에 연락처 없음');

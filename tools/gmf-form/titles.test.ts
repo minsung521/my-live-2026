@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { judge } from '../../packages/judge/src/judge';
 import type { Catalog, UserRecord } from '../../packages/judge/src/judge';
-import { EVIDENCE_MAX, GMF_TITLE_ORDER, TITLE_LABELS, cardSummary, longestSegment, pickTitle, residentShare, streakSubline } from './titles';
+import { EVIDENCE_MAX, GMF_TITLE_ORDER, TITLE_COLORS, TITLE_LABELS, cardSummary, longestSegment, pickTitle, residentShare, streakSubline } from './titles';
 import type { TitleResult } from './titles';
 
 const catalog = JSON.parse(readFileSync(new URL('../../data/gmf2026/catalog.json', import.meta.url), 'utf8')) as Catalog;
@@ -61,19 +61,19 @@ console.log('· resident');
 console.log('· 메인/서브');
 {
   const t = run('MBS 위주', rec({ [D1]: [MBS + '1220', MBS + '1420', MBS + '1640', MBS + '1910'], [D2]: [MBS + '1220', MBS + '1410', MBS + '1630', MBS + '1900'] }));
-  ok(t.id === 'mainPref' && t.evidence === '본 무대 8개 중 8개가 메인 스테이지', `MBS 위주 → mainPref (${t.id} / ${t.evidence})`);
+  ok(t.id === 'mainPref' && t.evidence === '본 무대 8개 중 8개가 메인 스테이지였어요', `MBS 위주 → mainPref (${t.id} / ${t.evidence})`);
 
   const cms = rec({ [D1]: [CMS + '1250', CMS + '1440', CMS + '1710', CMS + '2000'], [D2]: [CMS + '1240', CMS + '1430', CMS + '1650', CMS + '1920'] });
   const t3 = run('CMS 단일', cms);
-  ok(t3.id === 'oneStage' && t3.evidence === '8개 무대 전부 CMS', `CMS 단일 → oneStage (${t3.id} / ${t3.evidence})`);
+  ok(t3.id === 'oneStage' && t3.evidence === '8개 무대 모두 CMS였어요', `CMS 단일 → oneStage (${t3.id} / ${t3.evidence})`);
   ok(t3.label === TITLE_LABELS.oneStage, 'oneStage 라벨');
   const t3b = run('CMS 7 + LFG 1', rec({ [D1]: [CMS + '1250', CMS + '1440', CMS + '1710', CMS + '2000'], [D2]: [CMS + '1240', CMS + '1430', LFG + '1630', CMS + '1920'] }));
-  ok(t3b.id === 'oneStage' && t3b.evidence === '본 무대 8개 중 7개가 CMS', `CMS 87.5% → oneStage (${t3b.evidence})`);
+  ok(t3b.id === 'oneStage' && t3b.evidence === '본 무대 8개 중 7개가 CMS였어요', `CMS 87.5% → oneStage (${t3b.evidence})`);
 
   const t4 = run('CMS·LFG 반반, MBS 0', rec({ [D1]: [CMS + '1250', LFG + '1430', CMS + '1710', LFG + '2020'], [D2]: [LFG + '1240', CMS + '1430', LFG + '1630', CMS + '1920'] }));
-  ok(t4.id === 'subPref' && t4.evidence === '메인 스테이지 관람 0회', `반반·MBS 0 → subPref (${t4.id} / ${t4.evidence})`);
+  ok(t4.id === 'subPref' && t4.evidence === '메인 스테이지는 한 번도 안 갔어요', `반반·MBS 0 → subPref (${t4.id} / ${t4.evidence})`);
   const t4b = run('CMS·LFG 반반, MBS 1', rec({ [D1]: [CMS + '1250', LFG + '1340', CMS + '1440', LFG + '1640', CMS + '2000', LFG + '2020', MBS + '1530'], [D2]: [LFG + '1240', CMS + '1330', LFG + '1530', CMS + '1650', LFG + '1850', CMS + '2050'] }));
-  ok(t4b.id === 'subPref' && t4b.evidence === '본 무대 13개 중 메인은 1개뿐', `반반·MBS 1 → subPref (${t4b.id} / ${t4b.evidence})`);
+  ok(t4b.id === 'subPref' && t4b.evidence === '본 무대 13개 중 메인은 1개뿐이었어요', `반반·MBS 1 → subPref (${t4b.id} / ${t4b.evidence})`);
 
   const r5 = rec({ [D1]: [CMS + '1250', LFG + '1430', CMS + '1710', LFG + '2020', MBS + '1530'], [D2]: [LFG + '1240', CMS + '1430', LFG + '1630', CMS + '1920'] });
   const sub5 = judge(catalog, r5).metrics.find((m) => m.id === 'subPref')!;
@@ -84,10 +84,10 @@ console.log('· 메인/서브');
 console.log('· 시간대·헤드라이너');
 {
   const late = run('후반 위주', rec({ [D1]: [CMS + '1830', MBS + '1910', CMS + '2000', MBS + '2040', CMS + '2130'], [D2]: [LFG + '1850', MBS + '1900', LFG + '2020', CMS + '2050'] }));
-  ok(late.id === 'late' && late.evidence === '본 무대 9개 중 8개가 해 진 뒤', `후반 → late (${late.evidence})`);
+  ok(late.id === 'late' && late.evidence === '본 무대 9개 중 8개가 해 진 뒤였어요', `후반 → late (${late.evidence})`);
   ok(late.others.includes('headliner'), '양일 헤드라이너는 others');
   const early = run('초반 위주', rec({ [D1]: [MBS + '1220', LFG + '1240', CMS + '1340', MBS + '1420', LFG + '1530'], [D2]: [MBS + '1220', LFG + '1330', MBS + '1410', LFG + '1530'] }));
-  ok(early.id === 'early' && early.evidence === '본 무대 9개 중 7개가 해 지기 전', `초반 → early (${early.evidence})`);
+  ok(early.id === 'early' && early.evidence === '본 무대 9개 중 7개가 해 지기 전이었어요', `초반 → early (${early.evidence})`);
   const hl = run('헤드라이너만 양일', rec({ [D1]: [CMS + '2130'], [D2]: [CMS + '2050'] }));
   ok(hl.id === 'headliner' && hl.evidence === '이틀 모두 헤드라이너 무대를 봤어요', `양일 헤드라이너만 → headliner (${hl.id})`);
 }
@@ -142,19 +142,40 @@ console.log('· streak 근거 시간 표기');
   }
 }
 
-console.log('· statsOnly');
+console.log('· rookie (칭호 0개)');
 {
-  const t = run('3개만', rec({ [D1]: [MBS + '1220', LFG + '1240', CMS + '1340'] }));
-  ok(t.id === 'statsOnly' && t.label === null && t.evidence === null && t.tier === 0, `3개만 → statsOnly (${t.id})`);
-  ok(run('2개만', rec({ [D2]: [MBS + '1220', CMS + '1920'] })).id === 'statsOnly', '2개만 → statsOnly');
+  const r = rec({ [D1]: [MBS + '1220', LFG + '1240', CMS + '1340'] });
+  const t = run('3개만', r);
+  ok(t.id === 'rookie' && t.label === '그민페 신생아' && t.tier === 0 && !t.others.length, `3개만 → rookie (${t.id})`);
+  ok(t.evidence === '3개 무대를 봤어요. 내년엔 더 달려봐요', `rookie 근거 (${t.evidence})`);
+  ok(t.list.length === 1 && t.list[0].id === 'rookie', 'rookie 목록은 자기 하나');
+  ok(cardSummary(catalog, r, judge(catalog, r)).best?.name === '연정', 'rookie + 최고 무대 있음 (v1 best)');
+  ok(cardSummary(catalog, r, judge(catalog, r), null).best === null, 'rookie + 최고 무대 없음 (pick null)');
+  ok(run('2개만', rec({ [D2]: [MBS + '1220', CMS + '1920'] })).id === 'rookie', '2개만 → rookie');
+  ok(TITLE_COLORS.rookie === '#F2EBDD', 'rookie 성향색 미색');
+}
+
+console.log('· 해요체 끝맺음');
+{
+  const ends = /(어요|었어요|였어요|봐요|봤어요|갔어요)$/;
+  for (const { name, t } of examples) for (const it of t.list) if (!ends.test(it.evidence)) ok(false, `해요체 아님: ${name} / ${it.evidence}`);
+  ok(examples.every((e) => e.t.list.every((it) => ends.test(it.evidence))), `손 사례 ${examples.length}개 근거 모두 해요체`);
+  ok(examples.every((e) => e.t.list[0].id === e.t.id && e.t.list.length === e.t.others.length + 1), '목록 = 대표 + others');
 }
 
 console.log('· 카드 요약');
 {
   const r = rec({ [D1]: [MBS + '1220', CMS + '1250', LFG + '1240'], [D2]: [CMS + '1920', MBS + '1900'] });
-  const s = cardSummary(catalog, r, judge(catalog, r));
+  const res = judge(catalog, r);
+  const s = cardSummary(catalog, r, res);
   ok(s.views === 5 && s.stages.map((x) => `${x.short} ${x.count}`).join(' · ') === 'MBS 2 · CMS 2 · LFG 1', `스테이지 비율 (${s.stages.map((x) => x.count)})`);
-  ok(s.best.length === 2 && s.best[1].date === '10/18' && s.best[1].stage === 'CLUB MIDNIGHT SUNSET' && s.best[1].start === '19:20' && s.best[1].name === '쏜애플', `최고의 무대 (${JSON.stringify(s.best[1])})`);
+  ok(s.best?.date === '10/18' && s.best.stage === 'CMS' && s.best.start === '19:20' && s.best.name === '쏜애플', `최고의 무대 = 마지막 참가일 best (${JSON.stringify(s.best)})`);
+  ok(s.minutes === res.days.reduce((a, d) => a + d.unionMin, 0) && s.minutes > 0, `MINUTES = unionMin 합 (${s.minutes})`);
+  ok(s.dateLabel === '10.17—18', `날짜 이틀 (${s.dateLabel})`);
+  const r1 = rec({ [D2]: [CMS + '1920'] });
+  ok(cardSummary(catalog, r1, judge(catalog, r1)).dateLabel === '10.18', '날짜 하루');
+  const sp = cardSummary(catalog, r, res, { date: D1, performanceId: CMS + '1250' });
+  ok(sp.best?.date === '10/17' && sp.best.stage === 'CMS', `pick이 있으면 pick (${JSON.stringify(sp.best)})`);
 }
 
 // 무작위 기록 1500개 — 문구 길이·금지 표현·예외 없음
@@ -180,10 +201,13 @@ for (let i = 0; i < 1500; i++) {
   try {
     const t = pickTitle(catalog, r, judge(catalog, r));
     for (const s of [t.label, t.evidence, t.subline]) if (s && FORBIDDEN.some((re) => re.test(s))) ok(false, `금지 표현: ${s}`);
-    const len = [...(t.evidence ?? '')].length;
-    maxLen = Math.max(maxLen, len);
-    if (len > EVIDENCE_MAX) ok(false, `근거 ${len}자: ${t.evidence}`);
-    if (t.id !== 'statsOnly' && (!t.label || !t.evidence)) ok(false, `라벨·근거 비어 있음: ${t.id}`);
+    for (const it of t.list) {
+      const len = [...it.evidence].length;
+      maxLen = Math.max(maxLen, len);
+      if (len > EVIDENCE_MAX) ok(false, `근거 ${len}자: ${it.evidence}`);
+      if (!/요$/.test(it.evidence)) ok(false, `해요체 아님: ${it.evidence}`);
+    }
+    if (!t.label || !t.evidence) ok(false, `라벨·근거 비어 있음: ${t.id}`);
     if (t.id === 'streak' && !t.subline) ok(false, 'streak 보조 줄 없음');
     if (!seenIds.has(t.id)) seenIds.set(t.id, { r, t });
   } catch (e) {
@@ -201,7 +225,7 @@ ok(true, `무작위로 나온 칭호: ${[...seenIds.keys()].join(', ')}`);
 for (const [id, v] of seenIds) if (!examples.some((e) => e.t.id === id)) examples.push({ name: `무작위 (${id})`, ...v });
 
 if (process.argv.includes('--table'))
-  for (const { name, t } of examples) console.log(`| ${name} | ${t.label ?? '(statsOnly)'} | ${t.evidence ?? ''} | ${t.subline ?? ''} | ${[...(t.evidence ?? '')].length} |`);
+  for (const { name, t } of examples) console.log(`| ${name} | ${t.label} | ${t.evidence ?? ''} | ${t.subline ?? ''} | ${[...(t.evidence ?? '')].length} |`);
 
 console.log(fail ? `\n${fail}개 실패` : '\n모두 통과');
 process.exit(fail ? 1 : 0);
