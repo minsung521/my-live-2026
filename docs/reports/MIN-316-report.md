@@ -4,8 +4,8 @@
 - 배포 판단: **가능** (1단계 + 2단계 모두 구현. 단, 실기기 확인 전. 9번 체크리스트를 휴대폰으로 확인한 뒤 공개 권장)
 - 미리보기 URL: https://my-live-2026-git-claude-new-session-iucst1-minsung521s-projects.vercel.app/gmf (Vercel Authentication 보호, READY)
 - 브랜치: `claude/new-session-iucst1` — 세션 제약으로 `min-316-gmf-v2`에 푸시할 수 없어 `origin/min-316-gmf-v2`(`58cd795`) 위에서 이 브랜치를 땄어요. main과 PR #1은 건드리지 않았어요.
-- PR: 아래 PR 링크 참고 (이 브랜치 → main, 새 PR)
-- 커밋: `525ad41` 1단계 / `1df4592` 2단계 / 이 보고서 커밋
+- PR: https://github.com/minsung521/my-live-2026/pull/2 (이 브랜치 → main, 새 PR. PR #1은 머지하지 않음)
+- 커밋: `525ad41` 1단계 / `1df4592` 2단계 (미리보기 READY) / `8d852e6`·이 커밋 보고서
 - 일정: 1단계 푸시 16:34 KST, 2단계 푸시 16:39 KST (둘 다 데드라인 전)
 
 ## 2. 구현 범위
