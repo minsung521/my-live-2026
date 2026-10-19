@@ -1,6 +1,6 @@
 /** 칭호 매핑 검사 — 실제 그민페 catalog + 손으로 만든 record (npm run test:form) */
 import { readFileSync } from 'node:fs';
-import { judge } from '../../packages/judge/src/judge';
+import { DEFAULT_CONFIG, judge } from '../../packages/judge/src/judge';
 import type { Catalog, UserRecord } from '../../packages/judge/src/judge';
 import { EVIDENCE_MAX, GMF_TITLE_ORDER, TITLE_COLORS, TITLE_LABELS, cardSummary, longestSegment, pickTitle, residentShare, streakSubline } from './titles';
 import type { TitleResult } from './titles';
@@ -35,27 +35,57 @@ function run(name: string, r: UserRecord): TitleResult {
   return t;
 }
 
-// 1. resident — 하루 최소 12개를 스테이지를 오가며 골라야 85%에 도달 (전수 탐색으로 확인한 조합)
-const D1_12 = [MBS + '1220', MBS + '1320', MBS + '1420', MBS + '1530', MBS + '1640', MBS + '1750', MBS + '1910', MBS + '2040', CMS + '1250', CMS + '1830', CMS + '2000', CMS + '2130'];
-const D2_12 = [MBS + '1220', MBS + '1310', MBS + '1410', MBS + '1520', MBS + '1630', MBS + '1740', CMS + '1240', CMS + '1330', CMS + '1920', CMS + '2050', LFG + '1850', LFG + '2020'];
-const D2_11 = D2_12.filter((id) => id !== CMS + '1330'); // 11개로 낼 수 있는 최대 83.6%
+// 1. resident — 체류(그날 체크한 첫 공연 시작 ~ 마지막 공연 종료) 기준 (MIN-316 핫픽스)
+//    참가일 체류 합계 ÷ 프로그램 합계 ≥ 90% · 참가한 날마다 5개 이상 · 그날 최장 공백 ≤ 120분
 console.log('· resident');
+// 12:20~22:30 체류 100%, 8개, 최장 공백 50분 (16:20~17:10)
+const D1_8 = [MBS + '1220', MBS + '1320', MBS + '1420', MBS + '1530', CMS + '1710', CMS + '1830', CMS + '2000', CMS + '2130'];
 {
-  const r = rec({ [D1]: D1_12, [D2]: D2_12 });
-  const t = run('resident (양일 12개씩)', r);
-  ok(t.id === 'resident' && t.tier === 3, `양일 12개씩 → resident (${t.id})`);
-  ok(t.evidence === '이틀 시간표의 86%, 올림픽공원에 있었어요', `근거 내림 86% (${t.evidence})`);
-  ok(t.others.includes('watchTime') || t.others.includes('streak'), `others에 함께 충족한 칭호 (${t.others.join(',')})`);
-  const r2 = rec({ [D1]: D1_12, [D2]: D2_11 });
-  const res2 = judge(catalog, r2);
-  const share2 = res2.days[1].unionMin / (res2.days[1].programEnd - res2.days[1].programStart);
-  ok(share2 > 0.83 && share2 < 0.85, `경계: 둘째 날 ${(share2 * 100).toFixed(1)}%`);
-  ok(run('resident 경계 아래 (12+11개)', r2).id !== 'resident', '84% 대 하루가 있으면 resident 아님');
-  ok(run('resident 하루만', rec({ [D1]: all(D1) })).id !== 'resident', '하루만 참가하면 resident 아님');
-  // 16:40~17:50 70분 공백 (커버리지는 88%)
-  const gapRec = rec({ [D1]: all(D1, (id) => ![MBS + '1640', LFG + '1640', CMS + '1710'].includes(id)), [D2]: all(D2) });
-  const gapRes = judge(catalog, gapRec);
-  ok(residentShare(f, gapRec, gapRes).share > 0.9 && run('resident 공백 70분', gapRec).id !== 'resident', '커버리지가 높아도 공백 60분 초과면 resident 아님');
+  const t0 = run('resident 오프닝 + 마지막 공연만', rec({ [D1]: [MBS + '1220', CMS + '2130'] }));
+  ok(residentShare(f, rec({ [D1]: [MBS + '1220', CMS + '2130'] })).share === 1 && t0.id !== 'resident', `오프닝 + 마지막 2개만 → 체류 100%여도 resident 아님 (${t0.id})`);
+
+  const t = run('resident 하루 8개', rec({ [D1]: D1_8 }));
+  ok(t.id === 'resident' && t.tier === 3, `하루 5개 이상 · 체류 100% · 공백 50분 → resident (${t.id})`);
+  ok(t.evidence === '12:20~22:30, 올림픽공원에 있었어요', `하루 참가 근거 (${t.evidence})`);
+  ok(t.list[0].id === 'resident' && t.list.length === t.others.length + 1, '목록 첫 칸 = resident');
+
+  const gap130 = rec({ [D1]: D1_8.filter((id) => id !== CMS + '1710') });
+  ok(residentShare(f, gap130).days[0].maxGap === 130 && run('resident 공백 130분', gap130).id !== 'resident', '같은 기록에 130분 공백(16:20~18:30) → resident 아님');
+  const gap120 = rec({ [D1]: [MBS + '1220', MBS + '1320', MBS + '1420', CMS + '1710', CMS + '1830', CMS + '2000', CMS + '2130'] });
+  ok(residentShare(f, gap120).days[0].maxGap === 120 && run('resident 공백 120분', gap120).id === 'resident', '공백 120분(15:10~17:10)은 허용');
+
+  // 13:20~22:30 = 550 / 610 = 90.2%, 공백 110·110·120분
+  const four = [MBS + '1320', CMS + '1550', CMS + '1830', CMS + '2130'];
+  const r4 = rec({ [D1]: four });
+  ok(residentShare(f, r4).share > 0.9 && run('resident 4개 (체류 90.2%)', r4).id !== 'resident', '체류 90% 이상이어도 하루 4개면 resident 아님');
+  const t5 = run('resident 5개 (체류 90.2%)', rec({ [D1]: [...four, MBS + '1420'] }));
+  ok(t5.id === 'resident' && t5.evidence === '13:20~22:30, 올림픽공원에 있었어요', `하루 5개 · 90.2% → resident (${t5.id} / ${t5.evidence})`);
+}
+{
+  // 양일 합산: 1일차 610분 + 2일차 490분(13:10~21:20) = 1100 / 1220 = 90.2%, 2일차 480분(12:20~20:20)이면 1090 / 1220 = 89.3%
+  const D2_90 = [MBS + '1310', CMS + '1330', MBS + '1410', CMS + '1540', LFG + '1630', LFG + '1740', CMS + '1800', LFG + '1850', LFG + '2020'];
+  const D2_89 = [MBS + '1220', LFG + '1240', MBS + '1310', CMS + '1330', MBS + '1410', CMS + '1540', LFG + '1630', LFG + '1740', CMS + '1800', LFG + '1850', CMS + '1920'];
+  const r89 = rec({ [D1]: D1_8, [D2]: D2_89 });
+  const s89 = residentShare(f, r89).share;
+  ok(s89 > 0.89 && s89 < 0.9 && run('resident 양일 89%', r89).id !== 'resident', `양일 합산 ${(s89 * 100).toFixed(1)}% → resident 아님`);
+  const r90 = rec({ [D1]: D1_8, [D2]: D2_90 });
+  const t90 = run('resident 양일 90%', r90);
+  ok(t90.id === 'resident' && t90.evidence === '이틀 시간표의 90%, 올림픽공원에 있었어요', `양일 합산 90.2% → resident, 양일 근거 내림 (${t90.id} / ${t90.evidence})`);
+  ok(run('resident 1일차만 충족 + 2일차 4개', rec({ [D1]: D1_8, [D2]: D2_90.slice(0, 4) })).id !== 'resident', '참가한 날 중 하루라도 5개 미만이면 resident 아님');
+}
+{
+  // 분모 = 취소 공연을 뺀 그날 첫 공연 시작 ~ 마지막 공연 종료
+  ok(residentShare(f, rec({ [D2]: all(D2) })).days[0].program === 610, '실제 2일차: 첫 공연(산보)·마지막 공연(십란)이 취소가 아니라 분모 610분 그대로');
+  const cx = JSON.parse(JSON.stringify(catalog)) as Catalog;
+  const cxDay = cx.festivals[0].days.find((d) => d.date === D2)!;
+  (cxDay.performances.find((p) => p.id === CMS + '2050') as { canceled?: boolean }).canceled = true; // 십란을 취소로 → 마지막 종료 21:20 (이석원)
+  const fx = cx.festivals[0];
+  const r = rec({ [D2]: [MBS + '1220', LFG + '1240', MBS + '1310', CMS + '1330', MBS + '1410', CMS + '1540', LFG + '1630', LFG + '1740', CMS + '1800', LFG + '1850', CMS + '1920', LFG + '2020'] });
+  const res = judge(cx, r);
+  const rs = residentShare(fx, r);
+  ok(rs.days[0].program === 540 && res.days[0].programEnd - res.days[0].programStart === 610, `취소 공연 제외 분모 540분 (판정 모듈 프로그램 길이는 610분 그대로) (${rs.days[0].program})`);
+  const t = pickTitle(cx, r, res);
+  ok(rs.share === 1 && t.id === 'resident' && t.evidence === '12:20~21:20, 올림픽공원에 있었어요', `12:20~21:20 체류 → 540 / 540 = 100% → resident (${t.id} / ${t.evidence})`);
 }
 
 console.log('· 메인/서브');
@@ -95,48 +125,74 @@ console.log('· 시간대·헤드라이너');
 console.log('· 같은 단계 순서 (그민페 전용)');
 {
   ok(GMF_TITLE_ORDER.join() === 'oneStage,subPref,mainPref,early,late,streak,watchTime,headliner', '순서 상수');
-  const mbs1 = all(D1, (id) => id.startsWith(MBS));
-  const r = rec({ [D1]: mbs1 });
+  // 1일차 17:50~21:40 연결 230분(streak 3단계) + 2일차 MBS만 → 메인 비율 9/12 (mainPref 3단계), 체류 59%라 resident 아님
+  const r = rec({
+    [D1]: [MBS + '1220', MBS + '1530', MBS + '1640', MBS + '1750', MBS + '1910', MBS + '2040', CMS + '1830', CMS + '2000', LFG + '1640'],
+    [D2]: [MBS + '1220', MBS + '1310', MBS + '1410'],
+  });
   const res = judge(catalog, r);
   const tiers = Object.fromEntries(res.metrics.map((m) => [m.id, m.tier]));
-  const t = run('MBS 하루 종일 8개', r);
+  const t = run('MBS 위주 + 1일차 저녁 연결', r);
   ok(tiers.mainPref === 3 && tiers.streak === 3 && t.id === 'mainPref' && t.others.includes('streak'), `같은 3단계면 mainPref가 streak보다 앞 (${t.id}, others ${t.others})`);
   const cms = run('CMS 단일 (streak 없음)', rec({ [D1]: [CMS + '1250', CMS + '1440', CMS + '1710', CMS + '2000'], [D2]: [CMS + '1240', CMS + '1430', CMS + '1650', CMS + '1920'] }));
   ok(cms.id === 'oneStage', `oneStage 유지 (${cms.id})`);
 }
 
 console.log('· streak');
+// 실관람 시간(공백 ≤10분으로 이어진 구간의 합집합) 기준 · 160/190/220분 · 공연 3개 이상 (MIN-316 핫픽스)
+// 1일차 12:40~13:20 · 14:30~15:10 · 15:50~17:30 · 17:50~21:20 — 17:50~21:20(알레프·리도어·장기하·홍이삭, 합집합 3시간 20분)이 가장 긴 구간
+const STREAK_200 = [MBS + '1640', MBS + '1910', CMS + '1250', CMS + '1550', CMS + '1830', LFG + '1240', LFG + '1430', LFG + '1750', LFG + '2020'];
 {
-  const t = run('24개 전부 체크 (하루)', rec({ [D1]: all(D1) }));
-  ok(t.id === 'streak' && t.evidence === '10시간 10분 동안 무대가 이어졌어요', `24개 전부 → streak 근거 (${t.id} / ${t.evidence})`);
-  ok(t.subline === '연정 · 컨파인드 화이트 · 이승윤 외 21팀', `보조 줄 그대로 (${t.subline})`);
-  const t2 = run('24개 전부 체크 (양일)', rec({ [D1]: all(D1), [D2]: all(D2) }));
-  ok(t2.id === 'resident', `양일 24개씩은 resident (${t2.id})`);
+  const r = rec({ [D1]: STREAK_200 });
+  const res = judge(catalog, r);
+  const t = run('합집합 3시간 20분 체인', r);
+  const m = res.metrics.find((x) => x.id === 'streak')!;
+  ok(m.tier === 2 && m.value === 200, `합집합 200분 → 연속 관람 2단계 (${m.tier} / ${m.value})`);
+  ok(t.id === 'streak' && t.tier === 2 && t.evidence === '3시간 20분 동안 쉬지 않고 무대를 봤어요', `→ streak 2단계, 근거 (${t.id} / ${t.evidence})`);
+  ok(t.subline === '알레프 · 리도어 · 홍이삭 외 1팀', `보조 줄은 같은 구간 공연 (${t.subline})`);
+  const ls = longestSegment(res)!;
+  const ms = (m.details as { segment: { start: number; end: number } }).segment;
+  ok(ls.seg.start === ms.start && ls.seg.end === ms.end, '보조 줄 구간 = 판정 모듈이 고른 구간 (inner 우선)');
 
-  // 보조 줄 규칙 — 대표가 streak이 아니어도 streakSubline으로 확인
-  const mbs1 = all(D1, (id) => id.startsWith(MBS));
-  const sr = rec({ [D1]: mbs1 }, { [D1]: MBS + '1640' });
-  ok(streakSubline(catalog, sr, judge(catalog, sr)) === '연정 · 적재 · 이소라 외 5팀', '★가 구간 안 → 포함, 시작 시각 순');
-  ok(streakSubline(catalog, sr, judge(catalog, sr), 2) === '연정 · 적재 외 6팀', '2팀으로 줄이면 ★·첫 공연');
-  const sr2 = rec({ [D1]: mbs1 });
-  ok(streakSubline(catalog, sr2, judge(catalog, sr2)) === '연정 · 하이파이유니콘 · 이소라 외 5팀', '★가 첫 공연이면 다음 공연으로 채움');
-  const sr3 = rec({ [D1]: [...mbs1, CMS + '1250'] }, { [D1]: CMS + '1250' });
-  ok(streakSubline(catalog, sr3, judge(catalog, sr3)) === '연정 · 퓨처피어클럽 · 이소라 외 6팀', '★가 구간 중간이면 시작 시각 순 가운데');
-  const r4 = rec({ [D2]: all(D2, (id) => id.startsWith(CMS)) }, { [D2]: CMS + '2050' });
-  const t4 = run('CMS 하루 종일 (★ 십란)', r4);
-  ok(t4.id === 'streak' && t4.evidence === '9시간 50분 동안 무대가 이어졌어요', `CMS 하루 종일 → streak (${t4.id} / ${t4.evidence})`);
-  ok(t4.subline?.includes('십란(십센치X소란)') && !/십란\(십센치X소란\)[가-힣]/.test(t4.subline ?? ''), `가장 긴 이름 그대로, 조사 없음 (${t4.subline})`);
-  ok(!/→|->/.test(t4.subline ?? ''), '화살표 없음');
+  // 겹치는 공연 4개를 짧게 이어 체크: 12:40~14:10 합집합 90분
+  const short4 = rec({ [D1]: [LFG + '1240', CMS + '1250', MBS + '1320', LFG + '1340'] });
+  const sres = judge(catalog, short4);
+  const st = run('겹치는 공연 4개 짧게 (합집합 90분)', short4);
+  ok(sres.metrics.find((x) => x.id === 'streak')!.tier === 0 && st.id !== 'streak' && !st.others.includes('streak'), `겹치는 4개를 이어 봐도 합집합 2시간 미만 → 화장실 없음 (${st.id})`);
+
+  // 옮겨 다니기만 해서 예전 기준(공백 ≤30분 연결 구간 4시간)은 채우던 기록 → 화장실 대신 다른 칭호
+  const hop = rec({ [D1]: [MBS + '1220', MBS + '1640', CMS + '1250', CMS + '1340', LFG + '1430', LFG + '1530', LFG + '2020'] });
+  const hres = judge(catalog, hop);
+  const ht = run('옮겨 다닌 기록 (예전 화장실)', hop);
+  const old = judge(catalog, hop, { ...DEFAULT_CONFIG, ratioMinViews: 6, streak: { maxGapMin: 30, minPerformances: 2 }, tiers: { ...DEFAULT_CONFIG.tiers, streak: [240, 330, 420] } });
+  ok(old.representative.metricId === 'streak' && hres.metrics.find((x) => x.id === 'streak')!.tier === 0 && ht.id === 'early', `예전 기준 대표 streak → 지금은 화장실 없음, ${ht.id}`);
+
+  const t2 = run('24개 전부 체크 (양일)', rec({ [D1]: all(D1), [D2]: all(D2) }));
+  ok(t2.id === 'resident' && t2.others.includes('streak'), `양일 24개씩은 resident, streak은 others (${t2.id})`);
+
+  // 보조 줄 규칙 — 대표가 streak이 아니어도 streakSubline으로 확인. 1일차 12:20~16:20 공연 7개가 끊김 없이 이어짐
+  const chain = [MBS + '1220', CMS + '1250', MBS + '1320', CMS + '1340', MBS + '1420', CMS + '1440', MBS + '1530'];
+  const sr = rec({ [D1]: chain }, { [D1]: MBS + '1420' });
+  ok(streakSubline(catalog, sr, judge(catalog, sr)) === '연정 · 지소쿠리클럽 · 정준일 외 4팀', '★가 구간 안 → 포함, 시작 시각 순');
+  ok(streakSubline(catalog, sr, judge(catalog, sr), 2) === '연정 · 지소쿠리클럽 외 5팀', '2팀으로 줄이면 ★·첫 공연');
+  const sr2 = rec({ [D1]: chain });
+  ok(streakSubline(catalog, sr2, judge(catalog, sr2)) === '연정 · 퓨처피어클럽 · 정준일 외 4팀', '★가 첫 공연이면 다음 공연으로 채움');
+  const sr3 = rec({ [D1]: chain }, { [D1]: CMS + '1340' });
+  ok(streakSubline(catalog, sr3, judge(catalog, sr3)) === '연정 · 리브아워티어스 · 정준일 외 4팀', '★가 구간 중간이면 시작 시각 순 가운데');
+  // 2일차 18:50~22:30 (★ 십란)
+  const r4 = rec({ [D2]: [LFG + '1850', CMS + '1920', LFG + '2020', CMS + '2050'] }, { [D2]: CMS + '2050' });
+  const sub4 = streakSubline(catalog, r4, judge(catalog, r4));
+  ok(sub4?.includes('십란(십센치X소란)') && !/십란\(십센치X소란\)[가-힣]/.test(sub4 ?? ''), `가장 긴 이름 그대로, 조사 없음 (${sub4})`);
+  ok(!/→|->/.test(sub4 ?? ''), '화살표 없음');
 }
 
 console.log('· streak 근거 시간 표기');
 {
-  // 실제 기록으로 만들기 어려운 경계는 judge 결과의 구간 길이만 바꿔 확인
-  const r = rec({ [D1]: all(D1) });
+  // 실제 기록으로 만들기 어려운 경계는 judge 결과의 구간 내 공연시간만 바꿔 확인
+  const r = rec({ [D1]: STREAK_200 });
   const res = judge(catalog, r);
-  const seg = longestSegment(res)!.seg;
-  for (const [len, want] of [[45, '45분 동안 무대가 이어졌어요'], [120, '2시간 동안 무대가 이어졌어요'], [450, '7시간 30분 동안 무대가 이어졌어요']] as const) {
-    seg.length = len;
+  for (const [len, want] of [[45, '45분 동안 쉬지 않고 무대를 봤어요'], [120, '2시간 동안 쉬지 않고 무대를 봤어요'], [450, '7시간 30분 동안 쉬지 않고 무대를 봤어요']] as const) {
+    for (const d of res.days) for (const seg of d.segments) seg.inner = len;
     const t = pickTitle(catalog, r, res);
     ok(t.evidence === want, `${len}분 → ${t.evidence}`);
   }
@@ -180,7 +236,7 @@ console.log('· 카드 요약');
 
 // 무작위 기록 1500개 — 문구 길이·금지 표현·예외 없음
 console.log('· 무작위 기록 1500개');
-const FORBIDDEN = [/끝까지\s*남/, /쉬지\s*않고/, /개장부터/, /상위\s*\d+\s*%/, /\d+\s*%\s*안에/, /→/];
+const FORBIDDEN = [/끝까지\s*남/, /개장부터/, /상위\s*\d+\s*%/, /\d+\s*%\s*안에/, /→/];
 let seed = 7;
 const rand = () => ((seed = (seed * 1103515245 + 12345) % 2 ** 31) / 2 ** 31);
 const seenIds = new Map<string, { r: UserRecord; t: TitleResult }>();

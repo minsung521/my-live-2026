@@ -180,14 +180,14 @@ export function buildCases(): Case[] {
       id: 'C11',
       group: G.rule,
       title: '기본 칭호끼리 같은 단계',
-      focus: '연속 관람 2단계 = 관람시간 2단계 → 잠정 고정 순서(연속 관람 먼저). 동률 후보 모두 표시',
+      focus: '연속 관람 3단계 = 관람시간 3단계 → 잠정 고정 순서(연속 관람 먼저). 동률 후보 모두 표시',
       catalog: mkCatalog(fs),
-      record: { selections: pick('FA', '2026-08-15', ['M0', 'A0', 'B0', 'M1', 'A1', 'B1', 'M2', 'A2', 'B2', 'M3', 'M5']) },
+      record: { selections: pick('FA', '2026-08-15', ['M0', 'A0', 'B0', 'M1', 'A1', 'B1', 'M2', 'A2', 'B2', 'M3', 'M4', 'M5']) },
       expect: {
         rep: 'streak',
         checks: [
-          tierIs('streak', 2),
-          tierIs('watchTime', 2),
+          tierIs('streak', 3),
+          tierIs('watchTime', 3),
           { label: '동률 후보 = 연속 관람·관람시간', test: (r) => r.representative.tieCandidates.join(',') === 'streak,watchTime' },
         ],
       },
@@ -249,12 +249,13 @@ export function buildCases(): Case[] {
       id: 'C14',
       group: G.nat,
       title: '소표본 국적',
-      focus: '6팀 중 일본 3팀 → 고유 아티스트 8팀 미만이라 국적 지표만 계산 제외, 나머지는 판정',
+      focus: '6팀 중 일본 3팀 → 고유 아티스트 8팀 미만이라 국적 지표만 계산 제외, 나머지는 판정 (A3·B3·M4 연결 170분 → 연속 관람 1단계)',
       catalog: mkCatalog(fs),
       record: { selections: pick('FA', '2026-05-16', ['A1', 'B1', 'B3', 'M2', 'A3', 'M4']) },
       expect: {
-        rep: 'statsOnly',
+        rep: 'streak',
         checks: [
+          tierIs('streak', 1),
           { label: '일본 선호 계산 제외(고유 6팀)', test: (r) => !metric(r, 'japan').computable && /6팀/.test(metric(r, 'japan').excludedReason ?? '') },
           { label: '초반·후반은 계산됨', test: (r) => metric(r, 'early').computable && metric(r, 'late').computable },
         ],
@@ -402,12 +403,13 @@ export function buildCases(): Case[] {
     id: 'N2',
     group: G.overlap,
     title: '시간이 일부 겹치는 공연 2개',
-    focus: 'X2(14:00~15:00)·Z1(14:30~15:20) → 겹침 추정 이동 1회, 합집합 80분',
+    focus: 'X2(14:00~15:00)·Z1(14:30~15:20) → 겹침 추정 이동 1회, 합집합 80분 (관람 5개라 메인 선호 계산 → 3단계)',
     catalog: ovCat(),
     record: { selections: pick('OV', '2026-09-19', ['X1', 'X2', 'Z1', 'X4', 'X5']) },
     expect: {
-      rep: 'watchTime',
+      rep: 'mainPref',
       checks: [
+        tierIs('mainPref', 3),
         { label: '겹침 묶음 80분 · 추정 이동 1', test: (r) => { const c = clusterWith(r, 2); return !!c && c.end - c.start === 80 && c.inferredMin === 1; } },
         { label: 'X4→X5는 확정 비이동', test: (r) => r.days[0].boundaries.some((b) => b.type === 'confirmed-stay') },
       ],
@@ -453,19 +455,19 @@ export function buildCases(): Case[] {
       id: 'N5a',
       group: G.time,
       title: '하루 기록만 있는 경우',
-      focus: '후반 관람 패턴 하루 → 후반은 비율 지표라 3단계 가능, 헤드라이너는 표본 조건(2일)으로 0단계',
+      focus: '후반 관람 패턴 하루 → 후반은 비율 지표라 3단계 가능, 헤드라이너는 표본 조건(2일)으로 0단계. 18:20~22:00 220분 이어져 연속 관람도 3단계 → 고정 순서로 연속 관람이 대표',
       catalog: mkCatalog([fest('FA', '가상 페스티벌 A', [stdDay('A', '2026-05-16')])]),
       record: { selections: pick('FA', '2026-05-16', lateSel) },
-      expect: { rep: 'late', checks: [tierIs('late', 3), tierIs('headliner', 0)] },
+      expect: { rep: 'streak', checks: [tierIs('late', 3), tierIs('streak', 3), tierIs('headliner', 0)] },
     });
     cases.push({
       id: 'C12',
       group: G.time,
       title: '같은 성향이 3일 반복 · 후반과 헤드라이너 중복',
-      focus: 'N5a 패턴을 3일 반복 → 후반 3단계 그대로, 헤드라이너 2단계. 같은 기록으로 함께 높아지는지 확인',
+      focus: 'N5a 패턴을 3일 반복 → 후반 3단계 그대로, 헤드라이너 2단계. 같은 기록으로 함께 높아지는지 확인 (대표는 N5a와 같이 연속 관람)',
       catalog: mkCatalog(fs3()),
       record: { selections: days3.flatMap((d) => pick('FA', d, lateSel)) },
-      expect: { rep: 'late', checks: [tierIs('late', 3), tierIs('headliner', 2)] },
+      expect: { rep: 'streak', checks: [tierIs('late', 3), tierIs('streak', 3), tierIs('headliner', 2)] },
     });
 
     /* 마무리 공연이 서브 스테이지인 날: 템플릿 하루에 SUB1 A6(21:00~22:30)을 더한다. M5(20:30~22:00)와 60분 겹침.
@@ -525,16 +527,22 @@ export function buildCases(): Case[] {
       focus: '13:00~18:00 공연이 빈틈없이 이어짐 → 연결 구간 300분, 구간 내 공연시간 300분',
       catalog: gpCat(),
       record: { selections: pick('GP', '2026-09-26', ['G1', 'H1', 'G2', 'H2', 'G3', 'H3', 'G4']) },
-      expect: { rep: 'streak', checks: [tierIs('streak', 1), { label: '길이 300 · 공연시간 300', test: (r) => streakDetail(r)?.length === 300 && streakDetail(r)?.inner === 300 }] },
+      expect: { rep: 'streak', checks: [tierIs('streak', 3), { label: '길이 300 · 공연시간 300', test: (r) => streakDetail(r)?.length === 300 && streakDetail(r)?.inner === 300 }] },
     });
     cases.push({
       id: 'N6b',
       group: G.streak,
-      title: '연결 구간 5시간 · 공백 75분',
-      focus: '25분 공백 3번 → 연결 구간은 N6a와 같은 300분(같은 단계), 구간 내 공연시간은 225분으로 따로 저장',
+      title: '공백 25분으로 끊긴 공연 4개',
+      focus: '25분 공백 3번 → 공백 10분 초과라 구간이 공연 1개씩 끊김 → 공연 3개 이상 구간 없음, 연속 관람 계산 제외',
       catalog: gpCat(),
       record: { selections: pick('GP', '2026-09-26', ['G1', 'G2', 'G3', 'G4']) },
-      expect: { rep: 'streak', checks: [tierIs('streak', 1), { label: '길이 300 · 공연시간 225', test: (r) => streakDetail(r)?.length === 300 && streakDetail(r)?.inner === 225 }] },
+      expect: {
+        rep: 'statsOnly',
+        checks: [
+          { label: '연속 관람 계산 제외 (3개 이상 구간 없음)', test: (r) => !metric(r, 'streak').computable },
+          { label: '구간 4개 · 각 공연 1개', test: (r) => r.days[0].segments.length === 4 && r.days[0].segments.every((s) => s.count === 1) },
+        ],
+      },
     });
   }
 
@@ -542,14 +550,14 @@ export function buildCases(): Case[] {
   cases.push({
     id: 'C13',
     group: G.edge,
-    title: '기록 부족 (1곳 1일 5개)',
-    focus: '비율·국적 지표는 계산 제외, 관람시간·연속 관람은 계산 → 1단계 이상 없음 → 통계 카드만',
+    title: '기록 부족 (1곳 1일 4개)',
+    focus: '비율·국적 지표는 계산 제외, 관람시간은 계산 → 1단계 이상 없음 → 통계 카드만',
     catalog: mkCatalog([fest('FA', '가상 페스티벌 A', [stdDay('A', '2026-05-16')])]),
-    record: { selections: pick('FA', '2026-05-16', ['M0', 'A2', 'B3', 'A5', 'M5']) },
+    record: { selections: pick('FA', '2026-05-16', ['M0', 'B3', 'A5', 'M5']) },
     expect: {
       rep: 'statsOnly',
       checks: [
-        { label: '초반 관람 계산 제외 (5 < 6)', test: (r) => !metric(r, 'early').computable },
+        { label: '초반 관람 계산 제외 (4 < 5)', test: (r) => !metric(r, 'early').computable },
         { label: '관람시간은 계산됨', test: (r) => metric(r, 'watchTime').computable },
       ],
     },

@@ -115,9 +115,9 @@ export interface JudgeConfig {
 
 export const DEFAULT_CONFIG: JudgeConfig = {
   validDayMinViews: 3,
-  ratioMinViews: 6,
+  ratioMinViews: 5,
   nationality: { minUniqueArtists: 8, minCategoryArtists: 3 },
-  streak: { maxGapMin: 30, minPerformances: 2 },
+  streak: { maxGapMin: 10, minPerformances: 3 },
   meal: {
     windows: [
       { label: '점심', start: '12:00', end: '14:00' },
@@ -135,7 +135,7 @@ export const DEFAULT_CONFIG: JudgeConfig = {
     early: [15, 25, 35],
     late: [15, 25, 35],
     watchTime: [50, 65, 80],
-    streak: [240, 330, 420],
+    streak: [160, 190, 220],
     headliner: [
       { days: 2, rate: 60 },
       { days: 3, rate: 75 },
@@ -753,7 +753,7 @@ export function judge(catalog: Catalog, record: UserRecord, config: JudgeConfig 
   metrics.push(natMetric('japan', (c) => c === 'JP', '일본', T.japan));
   metrics.push(natMetric('foreign', (c) => c === 'JP' || c === 'OTHER', '해외', T.foreign));
 
-  /* 5. 연속 관람 — 연결 구간 길이(공백 포함)와 구간 내 공연시간(공백 제외)을 따로 저장 */
+  /* 5. 연속 관람 — 연결 구간 길이(공백 포함)와 구간 내 공연시간(공백 제외)을 따로 저장. 선택·단계는 구간 내 공연시간 기준 (MIN-316 핫픽스) */
   const segmentsByDay = new Map<RDay, Segment[]>();
   const mealWins = config.meal.windows.map((w) => ({ label: w.label, win: [parseTime(w.start), parseTime(w.end)] as Interval }));
   for (const d of days) {
@@ -789,25 +789,25 @@ export function judge(catalog: Catalog, record: UserRecord, config: JudgeConfig 
     let m = blank('streak', 'base');
     m.unit = '분';
     m.estimated = true;
-    m.estimateNote = '선택한 공연 시간표 기준. 연결 구간은 공백(≤30분)을 포함하며 실제 입·퇴장 시각이 아님';
-    m.denominatorText = `참가일 전체 중 가장 긴 연결 구간 (공백 ≤ ${config.streak.maxGapMin}분, 공연 ${config.streak.minPerformances}개 이상)`;
-    m.tierRule = `연결 구간 ≥ ${T.streak.map(fmtDuration).join(' / ')}`;
+    m.estimateNote = `선택한 공연 시간표 기준. 공백 ≤${config.streak.maxGapMin}분이면 이어진 것으로 보고, 구간 내 공연시간(공백 제외)으로 판정하며 실제 입·퇴장 시각이 아님`;
+    m.denominatorText = `참가일 전체 중 구간 내 공연시간이 가장 긴 연결 구간 (공백 ≤ ${config.streak.maxGapMin}분, 공연 ${config.streak.minPerformances}개 이상)`;
+    m.tierRule = `구간 내 공연시간 ≥ ${T.streak.map(fmtDuration).join(' / ')}`;
     let best: { d: RDay; s: Segment } | null = null;
     for (const d of days)
       for (const s of segmentsByDay.get(d)!) {
         if (s.count < config.streak.minPerformances) continue;
-        if (!best || s.length > best.s.length || (s.length === best.s.length && s.inner > best.s.inner)) best = { d, s };
+        if (!best || s.inner > best.s.inner || (s.inner === best.s.inner && s.length > best.s.length)) best = { d, s };
       }
     if (!best) m = exclude(m, `공연 ${config.streak.minPerformances}개 이상이 이어진 구간 없음`);
     else {
       const { d, s } = best;
-      m.value = s.length;
-      m.valueText = `${fmtDuration(s.length)} (${d.date} ${fmtTime(s.start)}~${fmtTime(s.end)})`;
-      m.note = `구간 내 공연시간 ${fmtDuration(s.inner)} · 공백 합계 ${fmtDuration(s.gap)} · 공연 ${s.count}개`;
-      m.tier = tierFrom(s.length, T.streak);
+      m.value = s.inner;
+      m.valueText = `${fmtDuration(s.inner)} (${d.date} ${fmtTime(s.start)}~${fmtTime(s.end)})`;
+      m.note = `연결 구간 ${fmtDuration(s.length)} · 공백 합계 ${fmtDuration(s.gap)} · 공연 ${s.count}개`;
+      m.tier = tierFrom(s.inner, T.streak);
       m.evidence = s.meals.length
-        ? `${s.meals.join('·')} 시간대에도 공연을 봤어요 · 최장 ${fmtDuration(s.length)} 구간 (공백 포함)`
-        : `최장 ${fmtDuration(s.length)} 구간에서 공연을 이어 봤어요 (공백 포함)`;
+        ? `${s.meals.join('·')} 시간대에도 공연을 봤어요 · ${fmtDuration(s.inner)} 동안 공연을 이어 봤어요`
+        : `${fmtDuration(s.inner)} 동안 공연을 이어 봤어요 (공백 ${config.streak.maxGapMin}분 이하)`;
       m.details = { date: d.date, festival: d.festival.name, segment: s };
     }
     metrics.push(m);
