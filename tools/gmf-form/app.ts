@@ -8,7 +8,7 @@ import catalogJson from '../../data/gmf2026/catalog.json';
 import type { Catalog, Performance } from '../../packages/judge/src/judge';
 import { validateRecord } from '../../packages/judge/src/judge';
 import type { UserRecord } from '../../packages/judge/src/judge';
-import { ANON_ID_RE, FORM_VERSION, SUBMIT_PATH, checkedKeys, dayLabel, effectivePick, emptyInput, makeAnonId, normalize, parseKey, toSubmission, toggleCheck } from './logic';
+import { ANON_ID_RE, FORM_VERSION, SUBMIT_PATH, checkedKeys, dayCount, dayLabel, dayNo, droppedDays, effectivePick, emptyInput, makeAnonId, nextButton, normalize, parseKey, restoreInput, selectedDays, setDays, toSubmission, toggleCheck } from './logic';
 import type { GmfPerformance, GmfRecord, InputState } from './logic';
 import { identify, initAnalytics, track } from './analytics';
 import { exampleCard, showResult, toast } from './result';
@@ -41,8 +41,8 @@ try {
   else localStorage.setItem(ANON_KEY, anonId);
   const raw = localStorage.getItem(DRAFT_KEY);
   if (raw) {
-    const d = JSON.parse(raw);
-    if (d && typeof d === 'object') st = normalize(fest, { ...emptyInput(), ...d });
+    // 참가일이 없는 예전 상태: 체크가 있는 날을 참가일로 (체크도 없으면 시트를 띄운다)
+    st = restoreInput(fest, JSON.parse(raw));
   }
 } catch {}
 
@@ -105,50 +105,61 @@ function showIntro() {
     .catch(() => {});
 }
 
-/* ───────── S2 그리드 ───────── */
+/* ───────── S2 그리드 (참가일 선택 · 하루씩 체크, Figma S2 v3) ───────── */
 
-function renderTabs() {
-  $('#tabs').innerHTML = fest.days
-    .map((d, i) => {
-      const n = (st.checked[d.date] ?? []).length;
-      const on = d.date === activeDay;
-      return `<button type="button" class="tab${on ? ' on' : ''}" data-tab="${d.date}" aria-pressed="${on}"><b>DAY ${i + 1}</b><span>${dayLabel(d.date)}${n ? ` · ${n}개 체크` : ''}</span></button>`;
-    })
-    .join('');
+/** 지금 보는 날 */
+let viewDay = fest.days[0].date;
+
+function renderHead() {
+  const days = selectedDays(fest, st);
+  const chosen = days.length > 0;
+  $('#days-change').hidden = !chosen;
+  $('#tabs').hidden = days.length < 2;
+  $('#dateline').hidden = days.length !== 1;
+  if (days.length === 1) $('#dateline').textContent = `DAY ${dayNo(fest, days[0])} · ${dayLabel(days[0])}`;
+  if (days.length >= 2)
+    $('#tabs').innerHTML = days
+      .map((d) => {
+        const n = dayCount(fest, st, d);
+        const on = d === viewDay;
+        return `<button type="button" class="tab${on ? ' on' : ''}" data-tab="${d}" aria-pressed="${on}"><b>DAY ${dayNo(fest, d)}</b><span${n ? ' class="cnt"' : ''}>${n ? `✓ ${n}개 체크` : dayLabel(d)}</span></button>`;
+      })
+      .join('');
+  const nb = nextButton(fest, st, viewDay);
+  const btn = $('#grid-next');
+  btn.textContent = nb.label;
+  btn.classList.toggle('dim', !nb.enabled);
 }
 
-let activeDay = fest.days[0].date;
-
+/** 보는 날 하루만 그린다 (이틀을 이어 붙이지 않음) */
 function renderGrid() {
   const check = '<svg viewBox="0 0 12 12" fill="none" stroke="#F2EBDD" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2l2.3 2.3 4.7-5"/></svg>';
-  $('#days').innerHTML = fest.days
-    .map((d, i) => {
-      const ps = d.performances;
-      const t0 = Math.floor(Math.min(...ps.map((p) => mins(p.start))) / 60) * 60;
-      const t1 = Math.ceil(Math.max(...ps.map((p) => mins(p.end))) / 60) * 60;
-      const h = (t1 - t0) * PX_PER_MIN;
-      const on = new Set(st.checked[d.date] ?? []);
-      const hours: number[] = [];
-      for (let t = t0; t <= t1; t += 60) hours.push(t);
-      const cols = fest.stages
-        .map((s) => {
-          const cells = ps
-            .filter((p) => p.stageId === s.id)
-            .map((p) => {
-              const top = (mins(p.start) - t0) * PX_PER_MIN;
-              const ht = (mins(p.end) - mins(p.start)) * PX_PER_MIN - 3;
-              // 취소 공연: 위치·높이 그대로, 회색 칸 + 취소 태그, 탭해도 체크되지 않음
-              if ((p as GmfPerformance).canceled)
-                return `<button type="button" class="cell canceled" style="top:${top}px;height:${ht}px" data-date="${d.date}" data-perf="${p.id}" aria-disabled="true" aria-label="${esc(artist(p))} ${p.start}–${p.end} ${STAGE_SHORT[p.stageId] ?? ''} 취소됨"><span class="nm">${esc(artist(p))}</span><span class="cx">취소</span></button>`;
-              const c = on.has(p.id);
-              return `<button type="button" class="cell s${stageIdx.get(p.stageId)}${c ? ' on' : ''}" style="top:${top}px;height:${ht}px" data-date="${d.date}" data-perf="${p.id}" aria-pressed="${c}" aria-label="${esc(artist(p))} ${p.start}–${p.end} ${STAGE_SHORT[p.stageId] ?? ''}"><span class="nm">${esc(artist(p))}</span><span class="ck">${check}</span></button>`;
-            })
-            .join('');
-          return `<div class="g-col" style="height:${h}px">${cells}</div>`;
+  const d = fest.days.find((x) => x.date === viewDay) ?? fest.days[0];
+  const ps = d.performances;
+  const t0 = Math.floor(Math.min(...ps.map((p) => mins(p.start))) / 60) * 60;
+  const t1 = Math.ceil(Math.max(...ps.map((p) => mins(p.end))) / 60) * 60;
+  const h = (t1 - t0) * PX_PER_MIN;
+  const on = new Set(st.checked[d.date] ?? []);
+  const hours: number[] = [];
+  for (let t = t0; t <= t1; t += 60) hours.push(t);
+  const cols = fest.stages
+    .map((s) => {
+      const cells = ps
+        .filter((p) => p.stageId === s.id)
+        .map((p) => {
+          const top = (mins(p.start) - t0) * PX_PER_MIN;
+          const ht = (mins(p.end) - mins(p.start)) * PX_PER_MIN - 3;
+          // 취소 공연: 위치·높이 그대로, 회색 칸 + 취소 태그, 탭해도 체크되지 않음
+          if ((p as GmfPerformance).canceled)
+            return `<button type="button" class="cell canceled" style="top:${top}px;height:${ht}px" data-date="${d.date}" data-perf="${p.id}" aria-disabled="true" aria-label="${esc(artist(p))} ${p.start}–${p.end} ${STAGE_SHORT[p.stageId] ?? ''} 취소됨"><span class="nm">${esc(artist(p))}</span><span class="cx">취소</span></button>`;
+          const c = on.has(p.id);
+          return `<button type="button" class="cell s${stageIdx.get(p.stageId)}${c ? ' on' : ''}" style="top:${top}px;height:${ht}px" data-date="${d.date}" data-perf="${p.id}" aria-pressed="${c}" aria-label="${esc(artist(p))} ${p.start}–${p.end} ${STAGE_SHORT[p.stageId] ?? ''}"><span class="nm">${esc(artist(p))}</span><span class="ck">${check}</span></button>`;
         })
         .join('');
-      return `<section class="g-day" id="day-${d.date}" data-day="${d.date}">
-  <h2>DAY ${i + 1} · ${dayLabel(d.date)}</h2>
+      return `<div class="g-col" style="height:${h}px">${cells}</div>`;
+    })
+    .join('');
+  $('#days').innerHTML = `<section class="g-day" data-day="${d.date}">
   <p class="hint">잠깐 들른 무대도, 시간이 겹치는 무대도 모두 체크해 주세요</p>${ps.some((p) => (p as GmfPerformance).canceled) ? '\n  <p class="hint-canceled">비 때문에 취소된 무대는 체크할 수 없어요</p>' : ''}
   <div class="g-stages"><span></span>${fest.stages.map((s, j) => `<span><i style="background:${STAGE_COLOR[j]}"></i>${STAGE_SHORT[s.id] ?? s.name}</span>`).join('')}</div>
   <div class="g-body">
@@ -157,9 +168,7 @@ function renderGrid() {
     ${cols}
   </div>
 </section>`;
-    })
-    .join('');
-  renderTabs();
+  renderHead();
 }
 
 function toggleCell(b: HTMLButtonElement) {
@@ -172,7 +181,7 @@ function toggleCell(b: HTMLButtonElement) {
   b.classList.toggle('on', on);
   b.setAttribute('aria-pressed', String(on));
   save();
-  renderTabs();
+  renderHead();
   renderProgress();
   const p = perf(date, id);
   track('gmf_performance_toggled', { date, performance_id: id, artist_id: p?.artistId, stage_id: p?.stageId, start: p?.start, on, checked_count: cur.size });
@@ -182,39 +191,87 @@ function toggleCell(b: HTMLButtonElement) {
   }
 }
 
-/** 스크롤 위치에 따라 DAY 탭을 바꾼다 */
-function syncTab() {
-  if ($('#grid').hidden) return;
-  const headH = $('.g-top').getBoundingClientRect().bottom;
-  let cur = fest.days[0].date;
-  for (const d of fest.days) {
-    const el = document.getElementById(`day-${d.date}`);
-    if (el && el.getBoundingClientRect().top <= headH + 40) cur = d.date;
-  }
-  if (cur !== activeDay) {
-    activeDay = cur;
-    renderTabs();
-  }
-}
-
-function gotoDay(date: string) {
-  const el = document.getElementById(`day-${date}`);
-  if (!el) return;
-  const headH = $('.g-top').getBoundingClientRect().height;
-  activeDay = date;
-  renderTabs();
-  window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - headH + 4, behavior: 'smooth' });
+/** 날 전환: 그 날 그리드로 바꾸고 맨 위로 */
+function switchDay(to: string, via: 'tab' | 'button') {
+  if (to !== viewDay) track('gmf_grid_day_switch', { to, via });
+  viewDay = to;
+  renderGrid();
+  window.scrollTo({ top: 0 });
 }
 
 function gridNext() {
-  const n = total();
-  if (!n) {
-    track('gmf_grid_empty_next');
-    toast('본 무대를 하나 이상 체크해 주세요');
+  const nb = nextButton(fest, st, viewDay);
+  if (!nb.enabled) {
+    // 흐림 버튼도 누를 수 있다: 체크 없는 날로 이동 + 위쪽 토스트
+    track('gmf_next_blocked', { reason: nb.blocked.reason, day: nb.blocked.day });
+    if (nb.blocked.to !== viewDay) switchDay(nb.blocked.to, 'button');
+    toast(nb.blocked.message);
     return;
   }
-  track('gmf_grid_next', { checked: n, days: fest.days.filter((d) => (st.checked[d.date] ?? []).length).map((d) => d.date) });
+  if (nb.action.kind === 'nextDay') return switchDay(nb.action.to, 'button');
+  track('gmf_grid_next', { checked: total(), days: selectedDays(fest, st) });
   openLikes();
+}
+
+/* ───────── 참가일 선택 시트 ───────── */
+
+/** 시트에서 고르는 중인 날 */
+let pickingDays: string[] = [];
+let daysChanged = false;
+
+function openDays(changed: boolean) {
+  daysChanged = changed;
+  pickingDays = selectedDays(fest, st);
+  renderDays();
+  $('#dsheet').hidden = false;
+}
+
+function renderDays() {
+  const tick = '<svg viewBox="0 0 12 12" fill="none" stroke="#14110F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2l2.3 2.3 4.7-5"/></svg>';
+  $('#dsheet .sheet-panel').innerHTML = `<h2 class="l-title">언제 다녀왔어요?</h2>
+<p class="l-sub">다녀온 날을 모두 골라 주세요</p>
+<div class="d-opts">${fest.days
+    .map((d) => {
+      const on = pickingDays.includes(d.date);
+      return `<button type="button" class="d-opt${on ? ' on' : ''}" data-dayopt="${d.date}" aria-pressed="${on}"><b>DAY ${dayNo(fest, d.date)}</b><span>${dayLabel(d.date)}</span><i class="d-ck">${on ? tick : ''}</i></button>`;
+    })
+    .join('')}</div>
+<button type="button" id="days-ok" class="cta${pickingDays.length ? '' : ' dim'}"${pickingDays.length ? '' : ' disabled'}>확인</button>`;
+}
+
+function renderDropConfirm(drop: { day: number; count: number }) {
+  $('#dsheet .sheet-panel').innerHTML = `<h2 class="l-title">DAY ${drop.day}를 빼면<br>체크한 ${drop.count}개가 지워져요</h2>
+<div class="d-confirm"><button type="button" id="drop-cancel" class="cta ghost">취소</button><button type="button" id="drop-ok" class="cta">빼기</button></div>`;
+}
+
+function applyDays() {
+  const before = selectedDays(fest, st);
+  st = setDays(fest, st, pickingDays);
+  save();
+  $('#dsheet').hidden = true;
+  const days = selectedDays(fest, st);
+  // 보는 날이 빠졌으면 남은 첫 날로, 날을 추가했으면 보는 날은 그대로
+  if (!days.includes(viewDay) || !before.length) viewDay = days[0];
+  track('gmf_days_selected', { days: days.length === 2 ? 'both' : String(dayNo(fest, days[0])), changed: daysChanged });
+  renderGrid();
+  renderProgress();
+  window.scrollTo({ top: 0 });
+}
+
+function daysOk() {
+  if (!pickingDays.length) return;
+  const drop = droppedDays(fest, st, pickingDays);
+  if (drop.length) return renderDropConfirm(drop[0]);
+  applyDays();
+}
+
+function startGrid() {
+  show('grid');
+  window.scrollTo({ top: 0 });
+  const days = selectedDays(fest, st);
+  if (!days.includes(viewDay)) viewDay = days[0] ?? fest.days[0].date;
+  renderGrid();
+  if (!days.length) openDays(false);
 }
 
 /* ───────── S3 좋아요·아쉬움 시트 ───────── */
@@ -342,7 +399,6 @@ async function submit() {
 
 function restart() {
   sheetDone = false;
-  renderGrid();
   showIntro();
 }
 
@@ -358,12 +414,18 @@ document.addEventListener('click', (e) => {
   if (!b) return;
   if (b.id === 'start') {
     track('gmf_intro_started');
-    show('grid');
-    window.scrollTo({ top: 0 });
-    syncTab();
+    startGrid();
   } else if (b.dataset.perf) toggleCell(b);
-  else if (b.dataset.tab) gotoDay(b.dataset.tab);
+  else if (b.dataset.tab) switchDay(b.dataset.tab, 'tab');
   else if (b.id === 'grid-next') gridNext();
+  else if (b.id === 'days-change') openDays(true);
+  else if (b.dataset.dayopt) {
+    const d = b.dataset.dayopt;
+    pickingDays = pickingDays.includes(d) ? pickingDays.filter((x) => x !== d) : [...pickingDays, d];
+    renderDays();
+  } else if (b.id === 'days-ok') daysOk();
+  else if (b.id === 'drop-ok') applyDays();
+  else if (b.id === 'drop-cancel') $('#dsheet').hidden = true; // [취소] = 그대로
   else if (b.dataset.like || b.dataset.regret) {
     const k = (b.dataset.like ?? b.dataset.regret)!;
     const like = !!b.dataset.like;
@@ -386,13 +448,13 @@ document.addEventListener('click', (e) => {
     renderPick();
   } else if (b.id === 'pick-back') {
     show('grid');
+    renderGrid();
     openLikes();
   } else if (b.id === 'pick-done') {
     track('gmf_pick_done', { likes: st.likes.length, skipped: false });
     void submit();
   }
 });
-window.addEventListener('scroll', syncTab, { passive: true });
 
 /** 마지막 결과 — v2 기록은 { selections, regrets, pick }, v1 기록은 { selections } (pick 없음 → best로 최고 무대) */
 function lastRecord(): { record: UserRecord; pick?: Pick | null } | null {

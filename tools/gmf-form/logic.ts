@@ -42,6 +42,8 @@ export interface GmfRecord extends UserRecord {
 }
 
 export interface InputState {
+  /** 참가일 선택 시트에서 고른 날 (YYYY-MM-DD, 비어 있으면 아직 안 고름) */
+  days: string[];
   /** 날짜별 체크한 공연 ID (체크한 날 = 참가일) */
   checked: Record<string, string[]>;
   /** 좋아요 `${date}|${performanceId}` */
@@ -52,7 +54,7 @@ export interface InputState {
   pick: string | null;
 }
 
-export const emptyInput = (): InputState => ({ checked: {}, likes: [], regrets: [], pick: null });
+export const emptyInput = (): InputState => ({ days: [], checked: {}, likes: [], regrets: [], pick: null });
 
 export const refKey = (date: string, performanceId: string) => `${date}|${performanceId}`;
 export const parseKey = (k: string): PerfRef => {
@@ -91,13 +93,91 @@ export function checkedKeys(f: Festival, st: InputState): string[] {
  */
 export function normalize(f: Festival, st: InputState): InputState {
   const checked: Record<string, string[]> = {};
-  for (const [date, ids] of Object.entries(st.checked)) checked[date] = ids.filter((id) => !isCanceled(f, date, id));
+  for (const [date, ids] of Object.entries(st.checked)) {
+    // 참가일을 골랐으면 고르지 않은 날의 체크는 버린다
+    if (st.days?.length && !st.days.includes(date)) continue;
+    checked[date] = ids.filter((id) => !isCanceled(f, date, id));
+  }
   st = { ...st, checked };
   const valid = new Set(checkedKeys(f, st));
   const likes = [...new Set(st.likes)].filter((k) => valid.has(k));
   const regrets = [...new Set(st.regrets)].filter((k) => valid.has(k) && !likes.includes(k));
   const pick = st.pick && likes.includes(st.pick) ? st.pick : null;
   return { ...st, likes, regrets, pick };
+}
+
+/* ───────── 참가일 선택 · 하루씩 체크 (Figma S2 v3) ───────── */
+
+/** 페스티벌 기준 DAY 번호 (10/17 = 1, 10/18 = 2) */
+export const dayNo = (f: Festival, date: string) => f.days.findIndex((d) => d.date === date) + 1;
+
+/** 그날 체크 수 (취소 공연 제외) */
+export const dayCount = (f: Festival, st: InputState, date: string) => checkedKeys(f, st).filter((k) => k.startsWith(`${date}|`)).length;
+
+/** 고른 참가일 (페스티벌 날짜 순) */
+export const selectedDays = (f: Festival, st: InputState) => f.days.map((d) => d.date).filter((d) => st.days.includes(d));
+
+/**
+ * 예전 localStorage 상태 복원. 참가일이 없으면 체크가 있는 날을 참가일로 보고, 체크도 없으면 비워 둔다(시트를 띄운다)
+ */
+export function restoreInput(f: Festival, raw: unknown): InputState {
+  const d = raw && typeof raw === 'object' ? (raw as Partial<InputState>) : {};
+  const base: InputState = {
+    days: Array.isArray(d.days) ? d.days.filter((x) => f.days.some((fd) => fd.date === x)) : [],
+    checked: d.checked && typeof d.checked === 'object' ? d.checked : {},
+    likes: Array.isArray(d.likes) ? d.likes : [],
+    regrets: Array.isArray(d.regrets) ? d.regrets : [],
+    pick: typeof d.pick === 'string' ? d.pick : null,
+  };
+  if (!base.days.length) {
+    const withChecks = normalize(f, { ...base, days: [] });
+    base.days = f.days.map((x) => x.date).filter((date) => dayCount(f, withChecks, date) > 0);
+  }
+  return normalize(f, base);
+}
+
+export interface NextButton {
+  label: '체크 완료' | 'DAY 2로 넘어가기';
+  /** 켜짐(크림) / 흐림 — 흐림도 누를 수 있다 */
+  enabled: boolean;
+  /** 켜졌을 때: 다음 날로 / 좋아요·아쉬움 시트 */
+  action: { kind: 'nextDay'; to: string } | { kind: 'sheet' };
+  /** 흐림을 눌렀을 때: 이동할 날 + 토스트 + 이벤트 사유 */
+  blocked: { to: string; message: string; reason: 'empty_day' | 'empty'; day: number };
+}
+
+/** 하단 버튼 문구·켜짐 조건 (지시서 2-3 표) */
+export function nextButton(f: Festival, st: InputState, viewing: string): NextButton {
+  const days = selectedDays(f, st);
+  if (days.length <= 1) {
+    const day = days[0] ?? viewing;
+    return {
+      label: '체크 완료',
+      enabled: dayCount(f, st, day) >= 1,
+      action: { kind: 'sheet' },
+      blocked: { to: day, message: '본 무대를 하나 이상 체크해 주세요', reason: 'empty', day: dayNo(f, day) },
+    };
+  }
+  const [d1, d2] = days;
+  const empty = days.find((d) => dayCount(f, st, d) === 0) ?? d1;
+  const blockedFor = (to: string) => ({ to, message: `DAY ${dayNo(f, to)}에 본 무대를 하나 이상 체크해 주세요`, reason: 'empty_day' as const, day: dayNo(f, to) });
+  if (viewing === d1) return { label: 'DAY 2로 넘어가기', enabled: dayCount(f, st, d1) >= 1, action: { kind: 'nextDay', to: d2 }, blocked: blockedFor(d1) };
+  return { label: '체크 완료', enabled: days.every((d) => dayCount(f, st, d) >= 1), action: { kind: 'sheet' }, blocked: blockedFor(empty) };
+}
+
+/** 참가일 변경 시 빠지는 날 중 체크가 있는 날 (확인 시트용) */
+export function droppedDays(f: Festival, st: InputState, next: string[]): { date: string; day: number; count: number }[] {
+  return selectedDays(f, st)
+    .filter((d) => !next.includes(d))
+    .map((date) => ({ date, day: dayNo(f, date), count: dayCount(f, st, date) }))
+    .filter((x) => x.count > 0);
+}
+
+/** 참가일 반영: 뺀 날의 체크·좋아요·아쉬움·대표 무대를 지운다 */
+export function setDays(f: Festival, st: InputState, next: string[]): InputState {
+  const days = f.days.map((d) => d.date).filter((d) => next.includes(d));
+  const checked = Object.fromEntries(Object.entries(st.checked).filter(([d]) => days.includes(d)));
+  return normalize(f, { ...st, days, checked });
 }
 
 /** 그리드 칸 탭: 체크/해제. 취소 공연은 무시하고 상태를 그대로 돌려준다 */

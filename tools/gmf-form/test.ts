@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { judge, validateRecord } from '../../packages/judge/src/judge';
 import type { Catalog } from '../../packages/judge/src/judge';
-import { CANCELED_ERROR, checkedKeys, defaultPick, effectivePick, emptyInput, isCanceled, makeAnonId, normalize, parseSubmission, refKey, toRecord, toSubmission, toggleCheck } from './logic';
+import { CANCELED_ERROR, checkedKeys, dayCount, droppedDays, nextButton, restoreInput, setDays, defaultPick, effectivePick, emptyInput, isCanceled, makeAnonId, normalize, parseSubmission, refKey, toRecord, toSubmission, toggleCheck } from './logic';
 import type { Submission } from './logic';
 import { handleSubmit } from './server';
 
@@ -126,6 +126,49 @@ console.log('· 2일차 우천 취소 공연');
   rej((x) => x.record.selections.push({ festivalId: 'gmf2026', date: d2, performanceId: 'loving-forest-garden-1530', best: true }), 'selections 좋아요');
   rej((x) => x.record.regrets.push({ date: d2, performanceId: 'mint-breeze-2030' }), 'regrets');
   rej((x) => (x.record.pick = { date: d2, performanceId: 'mint-breeze-1740' }), 'pick');
+}
+
+console.log('· 참가일 선택 · 하루씩 체크 (S2 v3)');
+{
+  const mk = (days: string[], checked: Record<string, string[]>) => ({ ...emptyInput(), days, checked });
+  const A = p1[0];
+  const B = 'club-midnight-sunset-2050';
+  // 하루
+  let nb = nextButton(f, mk([d1], {}), d1);
+  ok(nb.label === '체크 완료' && !nb.enabled && nb.blocked.reason === 'empty' && nb.blocked.message === '본 무대를 하나 이상 체크해 주세요' && nb.blocked.to === d1, '하루·체크 없음 → 체크 완료 흐림, 토스트');
+  nb = nextButton(f, mk([d1], { [d1]: [A] }), d1);
+  ok(nb.enabled && nb.action.kind === 'sheet', '하루·체크 있음 → 체크 완료 켜짐 → 시트');
+  nb = nextButton(f, mk([d2], { [d2]: ['mint-breeze-1900'] }), d2);
+  ok(!nb.enabled && nb.blocked.day === 2, '하루(DAY 2)·취소 공연만 체크 → 체크 수 0, 흐림');
+  // 이틀
+  nb = nextButton(f, mk([d1, d2], {}), d1);
+  ok(nb.label === 'DAY 2로 넘어가기' && !nb.enabled && nb.blocked.to === d1 && nb.blocked.message === 'DAY 1에 본 무대를 하나 이상 체크해 주세요', '이틀·DAY 1·체크 없음 → 넘어가기 흐림, DAY 1 토스트');
+  nb = nextButton(f, mk([d1, d2], { [d1]: [A] }), d1);
+  ok(nb.enabled && nb.action.kind === 'nextDay' && nb.action.to === d2, '이틀·DAY 1 체크 → DAY 2로 넘어가기 켜짐');
+  nb = nextButton(f, mk([d1, d2], { [d1]: [A] }), d2);
+  ok(nb.label === '체크 완료' && !nb.enabled && nb.blocked.to === d2 && nb.blocked.reason === 'empty_day' && nb.blocked.message.startsWith('DAY 2에'), '이틀·DAY 2·DAY 2 체크 없음 → 흐림, DAY 2로');
+  nb = nextButton(f, mk([d1, d2], { [d2]: [B] }), d2);
+  ok(!nb.enabled && nb.blocked.to === d1 && nb.blocked.day === 1, '이틀·DAY 2만 체크 → 흐림, DAY 1로 이동');
+  nb = nextButton(f, mk([d1, d2], {}), d2);
+  ok(!nb.enabled && nb.blocked.to === d1, '이틀·둘 다 없음 → DAY 1로');
+  nb = nextButton(f, mk([d1, d2], { [d1]: [A], [d2]: [B] }), d2);
+  ok(nb.enabled && nb.action.kind === 'sheet', '이틀·모두 체크 → 체크 완료 켜짐 → 시트');
+  // 날 빼기
+  const full = { ...mk([d1, d2], { [d1]: [A], [d2]: [B, 'mint-breeze-1220', 'loving-forest-garden-1240'] }), likes: [refKey(d1, A), refKey(d2, B)], regrets: [refKey(d2, 'mint-breeze-1220')], pick: refKey(d2, B) };
+  const drop = droppedDays(f, full, [d1]);
+  ok(drop.length === 1 && drop[0].day === 2 && drop[0].count === 3, `DAY 2 빼면 확인: 체크 3개 (${JSON.stringify(drop)})`);
+  ok(!droppedDays(f, mk([d1, d2], { [d1]: [A] }), [d1]).length, '체크 없는 날은 확인 없이');
+  const after = setDays(f, full, [d1]);
+  ok(after.days.join() === d1 && !after.checked[d2] && after.likes.join() === refKey(d1, A) && !after.regrets.length && after.pick === null, '빼기: 그 날의 체크·좋아요·아쉬움·대표 무대 삭제');
+  ok(setDays(f, mk([d1], { [d1]: [A] }), [d1, d2]).checked[d1].join() === A, '날 추가: 기존 체크 유지');
+  // 예전 localStorage 복원
+  const old = restoreInput(f, { checked: { [d2]: [B] }, likes: [refKey(d2, B)], regrets: [], pick: null });
+  ok(old.days.join() === d2 && dayCount(f, old, d2) === 1 && old.likes.length === 1, '예전 상태(참가일 없음) → 체크 있는 날이 참가일');
+  ok(restoreInput(f, { checked: {}, likes: [], regrets: [], pick: null }).days.length === 0, '체크도 없으면 참가일 비움 (시트)');
+  ok(restoreInput(f, { checked: { [d2]: ['mint-breeze-1900'] } }).days.length === 0, '취소 공연만 체크돼 있으면 참가일 비움');
+  const kept = restoreInput(f, { days: [d1, d2], checked: { [d1]: [A] } });
+  ok(kept.days.join() === `${d1},${d2}`, '참가일 저장돼 있으면 그대로 (체크 없는 날도 유지)');
+  ok(restoreInput(f, null).days.length === 0 && restoreInput(f, 'x').checked && true, '깨진 값도 빈 상태로');
 }
 
 console.log('· 처리부');

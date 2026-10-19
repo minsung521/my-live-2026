@@ -59,6 +59,24 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .tab span { font-size: 12px; color: var(--dim); font-weight: 500; }
 .tab.on { background: var(--cream); color: #14110F; border-color: var(--cream); }
 .tab.on span { color: rgba(20, 17, 15, 0.75); }
+/* 2줄째 '✓ n개 체크': 현재 탭(크림 면)은 진한 글자색, 다른 탭은 크림 */
+.tab span.cnt { color: var(--cream); font-weight: 700; }
+.tab.on span.cnt { color: #14110F; }
+/* 참가일 선택 · 하루씩 체크 (Figma S2 v3) */
+.g-right { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.chg { background: none; border: 0; padding: 2px 0; color: var(--dim); font-size: 12px; font-weight: 500; text-decoration: underline; text-underline-offset: 2px; }
+.g-dateline { margin: 0; font-size: 16px; font-weight: 700; }
+.cta.dim { background: rgba(242, 235, 221, 0.2); border-color: transparent; color: rgba(242, 235, 221, 0.5); }
+.cta.ghost { background: transparent; color: var(--cream); }
+.d-opts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 16px 0 18px; }
+.d-opt { position: relative; text-align: left; min-height: 84px; padding: 14px 16px; border-radius: 16px; border: 2px solid var(--line); background: #14110F; color: var(--cream); }
+.d-opt b { display: block; font-size: 20px; }
+.d-opt span { font-size: 13px; color: var(--dim); font-weight: 500; }
+.d-opt.on { border-color: var(--cream); box-shadow: 0 0 0 1px rgba(242, 235, 221, 0.35); }
+.d-ck { position: absolute; top: 12px; right: 12px; width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--line); display: grid; place-items: center; }
+.d-opt.on .d-ck { background: var(--cream); border-color: var(--cream); }
+.d-ck svg { width: 12px; height: 12px; }
+.d-confirm { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 18px; }
 .g-day { padding: 18px 16px 8px; }
 .g-day h2 { margin: 0; font-size: 18px; }
 .g-day .hint { margin: 4px 0 12px; font-size: 13px; color: var(--dim); }
@@ -221,8 +239,9 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 
   <section id="grid" hidden>
     <div class="g-top"><div class="scr">
-      <div class="g-head"><b>그랜드 민트 페스티벌 2026</b><span class="step">단계 1/2</span></div>
-      <div class="tabs" id="tabs"></div>
+      <div class="g-head"><b>그랜드 민트 페스티벌 2026</b><span class="g-right"><span class="step">단계 1/2</span><button type="button" id="days-change" class="chg" hidden>날짜 변경</button></span></div>
+      <div class="tabs" id="tabs" hidden></div>
+      <p class="g-dateline" id="dateline" hidden></p>
     </div></div>
     <div class="scr" id="days"></div>
     <div class="g-bottom"><button type="button" id="grid-next" class="cta">다음</button></div>
@@ -238,6 +257,8 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
     <div class="g-bottom"><button type="button" id="pick-done" class="cta">결과 보기</button></div>
   </section>
 </main>
+<!-- 참가일 선택 시트 (바깥을 눌러도 닫히지 않음) / 날짜 변경 확인 -->
+<div id="dsheet" class="sheet" hidden><div class="sheet-bg"></div><div class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="l-title"></div></div>
 <div id="lsheet" class="sheet" hidden><div class="sheet-bg"></div><div class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="l-title">
   <h2 class="l-title" id="l-title">가장 좋았던 무대를 골라주세요</h2>
   <p class="l-sub">여러 개 골라도 돼요. 아쉬움은 결과 카드에 나오지 않아요</p>
