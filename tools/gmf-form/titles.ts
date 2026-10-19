@@ -70,7 +70,7 @@ export const STAGE_SHORT: Record<string, string> = {
 
 /** 그민페 전용 추가 조건 (판정 모듈 결과 위에서만 거른다) */
 export const TITLE_RULES = {
-  resident: { minDayShare: 0.85, maxGapMin: 60 },
+  resident: { minShare: 0.9, minViewsPerDay: 5, maxGapMin: 120 },
   subPref: { minTier: 2, maxMainShare: 0.2, minViews: 6 },
   oneStage: { minShare: 0.7, minDeltaPp: 35 },
 };
@@ -93,6 +93,14 @@ function festivalOf(catalog: Catalog, record: UserRecord): Festival | null {
   return catalog.festivals.find((f) => f.id === id) ?? null;
 }
 
+/** 공연 시각(분). 자정을 넘기면 +24h */
+function span(p: { start: string; end: string }): [number, number] {
+  const start = parseTime(p.start);
+  let end = parseTime(p.end);
+  if (end <= start) end += 24 * 60;
+  return [start, end];
+}
+
 /** 날짜별 선택 공연 (catalog에 있는 것만, 중복 제거) */
 function viewsByDate(f: Festival, record: UserRecord) {
   const out = new Map<string, { id: string; stageId: string; start: number; end: number; best: boolean }[]>();
@@ -102,9 +110,7 @@ function viewsByDate(f: Festival, record: UserRecord) {
     const list = d.performances
       .filter((p) => picked.has(p.id))
       .map((p) => {
-        const start = parseTime(p.start);
-        let end = parseTime(p.end);
-        if (end <= start) end += 24 * 60;
+        const [start, end] = span(p);
         return { id: p.id, stageId: p.stageId, start, end, best: picked.get(p.id)! };
       });
     if (list.length) out.set(d.date, list);
@@ -120,22 +126,43 @@ export function maxInnerGap(intervals: [number, number][]): number {
   return gap;
 }
 
-/** resident 조건: 양일 모두 참가 · 각 날 합집합 ÷ 프로그램 ≥ 85% · 각 날 최장 공백 ≤ 60분 */
-export function residentShare(f: Festival, record: UserRecord, result: JudgeResult): { ok: boolean; share: number } {
+export interface ResidentDay {
+  date: string;
+  /** 체류 = 그날 체크한 공연의 첫 시작 ~ 마지막 종료 (분) */
+  start: number;
+  end: number;
+  /** 그날 프로그램 = 취소 공연을 뺀 첫 공연 시작 ~ 마지막 공연 종료 (분) */
+  program: number;
+  views: number;
+  maxGap: number;
+}
+
+/**
+ * resident 조건 (MIN-316 핫픽스): 참가일 체류 합계 ÷ 참가일 프로그램 합계 ≥ 90% · 참가한 날마다 체크 5개 이상 · 그날 최장 공백 ≤ 120분.
+ * 하루만 참가해도 받을 수 있다
+ */
+export function residentShare(f: Festival, record: UserRecord): { ok: boolean; share: number; days: ResidentDay[] } {
   const byDate = viewsByDate(f, record);
-  const days = result.days.filter((d) => d.festivalId === f.id);
-  const union = days.reduce((s, d) => s + d.unionMin, 0);
-  const program = days.reduce((s, d) => s + (d.programEnd - d.programStart), 0);
-  const share = program ? union / program : 0;
-  const allDays = f.days.every((fd) => days.some((d) => d.date === fd.date));
-  const ok =
-    allDays &&
-    days.every((d) => {
-      const L = d.programEnd - d.programStart;
-      const iv = (byDate.get(d.date) ?? []).map((v) => [v.start, v.end] as [number, number]);
-      return d.unionMin / L + EPS >= TITLE_RULES.resident.minDayShare && maxInnerGap(iv) <= TITLE_RULES.resident.maxGapMin;
+  const days: ResidentDay[] = [];
+  for (const d of f.days) {
+    const views = byDate.get(d.date);
+    if (!views) continue;
+    const prog = d.performances.filter((p) => !(p as { canceled?: boolean }).canceled).map(span);
+    days.push({
+      date: d.date,
+      start: Math.min(...views.map((v) => v.start)),
+      end: Math.max(...views.map((v) => v.end)),
+      program: prog.length ? Math.max(...prog.map(([, e]) => e)) - Math.min(...prog.map(([st]) => st)) : 0,
+      views: views.length,
+      maxGap: maxInnerGap(views.map((v) => [v.start, v.end])),
     });
-  return { ok, share };
+  }
+  const stay = days.reduce((s, d) => s + d.end - d.start, 0);
+  const program = days.reduce((s, d) => s + d.program, 0);
+  const share = program ? stay / program : 0;
+  const R = TITLE_RULES.resident;
+  const ok = days.length > 0 && share + EPS >= R.minShare && days.every((d) => d.views >= R.minViewsPerDay && d.maxGap <= R.maxGapMin);
+  return { ok, share, days };
 }
 
 /** 메인/비메인 스테이지별 관람 수 — 스테이지 2개 이상·메인이 있는 참가일만 (판정 모듈 메인/서브 선호와 같은 범위) */
@@ -179,13 +206,13 @@ function subPrefPasses(m: MetricResult, f: Festival, record: UserRecord, result:
   return n > 0 && main / n <= TITLE_RULES.subPref.maxMainShare + EPS;
 }
 
-/** 판정 모듈이 고른 가장 긴 연결 구간과 같은 규칙 (공연 2개 이상, 길이 최대 → 같으면 구간 내 공연시간 최대, 먼저 나온 것) */
+/** 판정 모듈이 고른 연결 구간과 같은 규칙 (공연 minPerformances개 이상, 구간 내 공연시간 최대 → 같으면 길이 최대, 먼저 나온 것) */
 export function longestSegment(result: JudgeResult): { date: string; seg: Segment } | null {
   let best: { date: string; seg: Segment } | null = null;
   for (const d of result.days)
     for (const s of d.segments) {
       if (s.count < DEFAULT_CONFIG.streak.minPerformances) continue;
-      if (!best || s.length > best.seg.length || (s.length === best.seg.length && s.inner > best.seg.inner)) best = { date: d.date, seg: s };
+      if (!best || s.inner > best.seg.inner || (s.inner === best.seg.inner && s.length > best.seg.length)) best = { date: d.date, seg: s };
     }
   return best;
 }
@@ -230,8 +257,12 @@ function evidenceFor(id: TitleId, m: MetricResult | undefined, ctx: { f: Festiva
   const n = m?.denominator ?? 0;
   const k = m?.numerator ?? 0;
   switch (id) {
-    case 'resident':
-      return `이틀 시간표의 ${Math.floor(residentShare(ctx.f, ctx.record, ctx.result).share * 100 + EPS)}%, 올림픽공원에 있었어요`;
+    case 'resident': {
+      const r = residentShare(ctx.f, ctx.record);
+      return r.days.length === 1
+        ? `${fmtTime(r.days[0].start)}~${fmtTime(r.days[0].end)}, 올림픽공원에 있었어요`
+        : `이틀 시간표의 ${Math.floor(r.share * 100 + EPS)}%, 올림픽공원에 있었어요`;
+    }
     case 'mainPref':
       return `본 무대 ${n}개 중 ${k}개가 메인 스테이지였어요`;
     case 'subPref': {
@@ -253,8 +284,8 @@ function evidenceFor(id: TitleId, m: MetricResult | undefined, ctx: { f: Festiva
       return ctx.result.stats.validDays > 1 ? `하루 공연 시간의 평균 ${p}%를 채웠어요` : `하루 공연 시간의 ${p}%를 채웠어요`;
     }
     case 'streak':
-      // 연결 구간 길이(공백 포함, 분) — 2시간 / 45분 / 7시간 30분
-      return `${fmtDuration(longestSegment(ctx.result)?.seg.length ?? 0)} 동안 무대가 이어졌어요`;
+      // 구간 내 공연시간(합집합, 공백 제외, 분) — 2시간 / 45분 / 3시간 20분
+      return `${fmtDuration(longestSegment(ctx.result)?.seg.inner ?? 0)} 동안 쉬지 않고 무대를 봤어요`;
     case 'headliner':
       return '이틀 모두 헤드라이너 무대를 봤어요';
     case 'rookie':
@@ -298,7 +329,7 @@ export function pickTitle(catalog: Catalog, record: UserRecord, result: JudgeRes
     list: [top, ...rest],
   });
 
-  if (residentShare(f, record, result).ok) return make(item('resident', undefined), 3, cands.map((c) => item(c.id, c.metric)));
+  if (residentShare(f, record).ok) return make(item('resident', undefined), 3, cands.map((c) => item(c.id, c.metric)));
   if (!cands.length) return rookie;
   const [top, ...rest] = cands;
   return make(item(top.id, top.metric), top.metric.tier, rest.map((c) => item(c.id, c.metric)));

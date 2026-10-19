@@ -194,7 +194,7 @@ function renderMain() {
       <tr><td>메인 / 서브 선호</td><td class="mono">Δ ±${T.mainPref.join(' / ')}%p</td><td>관람 ${DEFAULT_CONFIG.ratioMinViews}개 이상, 스테이지 2개↑인 날</td></tr>
       <tr><td>초반 / 후반 관람</td><td class="mono">Δ +${T.early.join(' / +')}%p</td><td>하루 일정 3등분, 공연 중간 시각 기준</td></tr>
       <tr><td>관람시간</td><td class="mono">${T.watchTime.join(' / ')}%</td><td>관람 3개↑인 날의 프로그램 대비 평균</td></tr>
-      <tr><td>연속 관람</td><td class="mono">${T.streak.map(fmtDuration).join(' / ')}</td><td>공백 ≤ ${DEFAULT_CONFIG.streak.maxGapMin}분, 연결 구간 길이</td></tr>
+      <tr><td>연속 관람</td><td class="mono">${T.streak.map(fmtDuration).join(' / ')}</td><td>공백 ≤ ${DEFAULT_CONFIG.streak.maxGapMin}분 · 공연 ${DEFAULT_CONFIG.streak.minPerformances}개 이상, 구간 내 공연시간(공백 제외)</td></tr>
       <tr><td>헤드라이너 관람</td><td class="mono">${T.headliner.map((t) => `${t.days}일·${t.rate}%`).join(' / ')}</td><td>본 날 수와 비율을 함께 · 메인 마지막 + 확인 후 표시한 서브 마무리 공연, 하나라도 보면 1일</td></tr>
       <tr><td>동률 순서 (특별)</td><td colspan="2">${DEFAULT_CONFIG.order.special.map((id) => METRIC_NAMES[id]).join(' → ')}</td></tr>
       <tr><td>동률 순서 (기본)</td><td colspan="2">${DEFAULT_CONFIG.order.base.map((id) => METRIC_NAMES[id]).join(' → ')}</td></tr>
