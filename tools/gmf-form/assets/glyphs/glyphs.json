@@ -1,0 +1,285 @@
+{
+ "fontSize": 200,
+ "height": 197,
+ "baseline": 143,
+ "padX": 4,
+ "titles": {
+  "resident": {
+   "lines": [
+    {
+     "text": "올림픽공원",
+     "file": "title-resident-1.png",
+     "w": 897,
+     "h": 197
+    },
+    {
+     "text": "거주민",
+     "file": "title-resident-2.png",
+     "w": 541,
+     "h": 197
+    }
+   ],
+   "inline": {
+    "text": "올림픽공원 거주민",
+    "file": "title-resident-inline.png",
+    "w": 1501,
+    "h": 197
+   }
+  },
+  "mainPref": {
+   "lines": [
+    {
+     "text": "메인스테이지",
+     "file": "title-mainPref-1.png",
+     "w": 1075,
+     "h": 197
+    },
+    {
+     "text": "지박령",
+     "file": "title-mainPref-2.png",
+     "w": 541,
+     "h": 197
+    }
+   ],
+   "inline": {
+    "text": "메인스테이지 지박령",
+    "file": "title-mainPref-inline.png",
+    "w": 1679,
+    "h": 197
+   }
+  },
+  "subPref": {
+   "lines": [
+    {
+     "text": "메인스테이지는",
+     "file": "title-subPref-1.png",
+     "w": 1252,
+     "h": 197
+    },
+    {
+     "text": "거부한다",
+     "file": "title-subPref-2.png",
+     "w": 719,
+     "h": 197
+    }
+   ],
+   "inline": {
+    "text": "메인스테이지는 거부한다",
+    "file": "title-subPref-inline.png",
+    "w": 2035,
+    "h": 197
+   }
+  },
+  "oneStage": {
+   "lines": [
+    {
+     "text": "한 무대",
+     "file": "title-oneStage-1.png",
+     "w": 612,
+     "h": 197
+    },
+    {
+     "text": "지박령",
+     "file": "title-oneStage-2.png",
+     "w": 541,
+     "h": 197
+    }
+   ],
+   "inline": {
+    "text": "한 무대 지박령",
+    "file": "title-oneStage-inline.png",
+    "w": 1217,
+    "h": 197
+   }
+  },
+  "early": {
+   "lines": [
+    {
+     "text": "선크림",
+     "file": "title-early-1.png",
+     "w": 541,
+     "h": 197
+    },
+    {
+     "text": "덧바르는 중",
+     "file": "title-early-2.png",
+     "w": 968,
+     "h": 197
+    }
+   ],
+   "inline": {
+    "text": "선크림 덧바르는 중",
+    "file": "title-early-inline.png",
+    "w": 1572,
+    "h": 197
+   }
+  },
+  "late": {
+   "lines": [
+    {
+     "text": "해 지고",
+     "file": "title-late-1.png",
+     "w": 612,
+     "h": 197
+    },
+    {
+     "text": "출근",
+     "file": "title-late-2.png",
+     "w": 364,
+     "h": 197
+    }
+   ],
+   "inline": {
+    "text": "해 지고 출근",
+    "file": "title-late-inline.png",
+    "w": 1039,
+    "h": 197
+   }
+  },
+  "watchTime": {
+   "lines": [
+    {
+     "text": "고막",
+     "file": "title-watchTime-1.png",
+     "w": 364,
+     "h": 197
+    },
+    {
+     "text": "초과근무",
+     "file": "title-watchTime-2.png",
+     "w": 719,
+     "h": 197
+    }
+   ],
+   "inline": {
+    "text": "고막 초과근무",
+    "file": "title-watchTime-inline.png",
+    "w": 1146,
+    "h": 197
+   }
+  },
+  "streak": {
+   "lines": [
+    {
+     "text": "화장실은",
+     "file": "title-streak-1.png",
+     "w": 719,
+     "h": 197
+    },
+    {
+     "text": "언제 가요?",
+     "file": "title-streak-2.png",
+     "w": 934,
+     "h": 197
+    }
+   ],
+   "inline": {
+    "text": "화장실은 언제 가요?",
+    "file": "title-streak-inline.png",
+    "w": 1717,
+    "h": 197
+   }
+  },
+  "headliner": {
+   "lines": [
+    {
+     "text": "헤드라이너",
+     "file": "title-headliner-1.png",
+     "w": 897,
+     "h": 197
+    },
+    {
+     "text": "절대 사수",
+     "file": "title-headliner-2.png",
+     "w": 790,
+     "h": 197
+    }
+   ],
+   "inline": {
+    "text": "헤드라이너 절대 사수",
+    "file": "title-headliner-inline.png",
+    "w": 1750,
+    "h": 197
+   }
+  },
+  "rookie": {
+   "lines": [
+    {
+     "text": "그민페",
+     "file": "title-rookie-1.png",
+     "w": 541,
+     "h": 197
+    },
+    {
+     "text": "신생아",
+     "file": "title-rookie-2.png",
+     "w": 541,
+     "h": 197
+    }
+   ],
+   "inline": {
+    "text": "그민페 신생아",
+    "file": "title-rookie-inline.png",
+    "w": 1146,
+    "h": 197
+   }
+  }
+ },
+ "digits": {
+  "0": {
+   "file": "digit-0.png",
+   "w": 132,
+   "advance": 123.734375
+  },
+  "1": {
+   "file": "digit-1.png",
+   "w": 97,
+   "advance": 89.0625
+  },
+  "2": {
+   "file": "digit-2.png",
+   "w": 131,
+   "advance": 122.671875
+  },
+  "3": {
+   "file": "digit-3.png",
+   "w": 133,
+   "advance": 124.796875
+  },
+  "4": {
+   "file": "digit-4.png",
+   "w": 146,
+   "advance": 137.59375
+  },
+  "5": {
+   "file": "digit-5.png",
+   "w": 132,
+   "advance": 123.734375
+  },
+  "6": {
+   "file": "digit-6.png",
+   "w": 140,
+   "advance": 131.5625
+  },
+  "7": {
+   "file": "digit-7.png",
+   "w": 126,
+   "advance": 118.21875
+  },
+  "8": {
+   "file": "digit-8.png",
+   "w": 143,
+   "advance": 135.109375
+  },
+  "9": {
+   "file": "digit-9.png",
+   "w": 132,
+   "advance": 124.4375
+  },
+  ",": {
+   "file": "digit-comma.png",
+   "w": 75,
+   "advance": 67.203125
+  }
+ }
+}

@@ -8,7 +8,7 @@
 | --- | --- |
 | `packages/judge` | 성향 판정 로직(순수 함수, 의존성 없음) + 가상 사례 + 테스트 |
 | `tools/judge-console` | 판정 로직 내부 테스트 화면 |
-| `tools/gmf-form` | 그민페 2026 테스트 기록 수집 폼(`/gmf`) + 저장 API(`/api/gmf-submit`) + PostHog 계측 |
+| `tools/gmf-form` | 그민페 2026 테스트 기록 수집 폼(`/gmf`) + 제출 즉시 칭호 판정·결과 카드(canvas PNG)·피드백 + 저장 API(`/api/gmf-submit`, `/api/gmf-feedback`) + PostHog 계측 |
 | `data/<행사>` | 수록 페스티벌 catalog + 대조 출처 (`npm test`가 표시 경고·판정 실행을 함께 검사) |
 | `app/` | 서비스 앱 (기술 스택 확정 후 추가) |
 
@@ -19,7 +19,7 @@ npm install
 npm test               # 단위 테스트 + 가상 사례 28개 기대값 검사
 npm run typecheck
 npm run build:console  # tools/judge-console/dist/index.html 생성
-npm run test:form      # 기록 수집 폼 로직 검사
+npm run test:form      # 기록 수집 폼 로직 + 칭호 매핑 + 피드백 검사
 npm run build:form     # tools/gmf-form/dist/index.html + .vercel/output 생성
 ```
 
@@ -29,8 +29,8 @@ npm run build:form     # tools/gmf-form/dist/index.html + .vercel/output 생성
 
 | 서비스 | 이름 | 비고 |
 | --- | --- | --- |
-| Vercel | 프로젝트 `my-live-2026` (main 브랜치 자동 배포) | `/gmf` 폼, `/api/gmf-submit`, `/ingest/*` PostHog 프록시. 본 서비스 전까지 `/`는 `/gmf`로 임시 이동 |
-| Neon | 프로젝트 `my-live-2026` (싱가포르, Vercel 연동) | `gmf_records`·`gmf_contacts`. 앱은 INSERT/UPDATE만 가능한 `gmf_app` 계정(`GMF_DATABASE_URL`)으로 접속 |
+| Vercel | 프로젝트 `my-live-2026` (main 브랜치 자동 배포) | `/gmf` 폼, `/api/gmf-submit`, `/api/gmf-feedback`, `/ingest/*` PostHog 프록시. 본 서비스 전까지 `/`는 `/gmf`로 임시 이동 |
+| Neon | 프로젝트 `my-live-2026` (싱가포르, Vercel 연동) | `gmf_records`·`gmf_contacts`·`gmf_feedback`(`tools/gmf-form/sql/002_gmf_feedback.sql`, INSERT만). 앱은 `gmf_app` 계정(`GMF_DATABASE_URL`)으로 접속 |
 | PostHog | 프로젝트 `MY LIVE 2026` (US) | 슈퍼 속성 `surface`로 구분 (`gmf-test` / 본 서비스) |
 
 ### 그민페 폼 이벤트
@@ -44,8 +44,19 @@ npm run build:form     # tools/gmf-form/dist/index.html + .vercel/output 생성
 | `gmf_submit_clicked` | `days`, `selection_count`, `has_contact`, `blocked`, `problem_steps` |
 | `gmf_submit_succeeded` | 위 요약 + `resubmit` (제출 성공 시 DB와 같은 익명 ID로 identify) |
 | `gmf_submit_failed` | 위 요약 + `error` |
+| `gmf_result_shown` | `title_id`, `title_label`, `tier`, `others`, `stats_only`, `judge_version`, `views`, `restored`(새로고침 뒤 다시 보여줌) |
+| `gmf_card_save_clicked` | `method`: `share` / `download` |
+| `gmf_card_share_result` | `outcome`: `shared` / `cancelled` / `error` |
+| `gmf_card_render_failed` | `error` (카드 PNG 생성 실패) |
+| `gmf_feedback_submitted` | `title_id`, `fit`, `understood`, `share`, `show_parts`, `chips`, `has_comment` (한마디 본문은 넣지 않음) |
+| `gmf_feedback_failed` | `error` |
+| `gmf_edit_clicked` | 없음 |
 
-연락처는 어떤 이벤트에도 넣지 않는다.
+연락처는 어떤 이벤트·카드·피드백에도 넣지 않는다.
+
+### 그민페 칭호 (`tools/gmf-form/titles.ts`)
+
+판정 모듈 결과 위에서 그민페용 대표 칭호 하나를 고른다. 올림픽공원 거주자(양일 각 85% 이상·공백 60분 이하)가 최우선, 그다음 판정 모듈 기본 칭호(메인/서브 선호·초반/후반·관람시간·연속 관람·헤드라이너) 중 단계 최대 → 같은 단계면 그민페 전용 순서 `GMF_TITLE_ORDER`(한 무대/서브 선호 → 메인 선호 → 초반 → 후반 → 연속 관람 → 관람시간 → 헤드라이너). 서브 선호는 2단계 이상·메인 20% 이하·관람 6개 이상일 때만, 한 스테이지에 70% 이상 몰렸으면 '한 무대 지박령'으로 바꿔 보여준다. 라벨은 `TITLE_LABELS`, 카드 좌표·색은 `card.ts`의 `CARD`에 모아 둔다 (MIN-314에서 재결정).
 
 ## 판정 로직 v0.1.1
 

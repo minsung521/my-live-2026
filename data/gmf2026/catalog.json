@@ -466,35 +466,40 @@
               "artistId": "bol4",
               "stageId": "mint-breeze",
               "start": "15:20",
-              "end": "16:10"
+              "end": "16:10",
+              "canceled": true
             },
             {
               "id": "mint-breeze-1630",
               "artistId": "jung-seung-hwan",
               "stageId": "mint-breeze",
               "start": "16:30",
-              "end": "17:20"
+              "end": "17:20",
+              "canceled": true
             },
             {
               "id": "mint-breeze-1740",
               "artistId": "roy-kim",
               "stageId": "mint-breeze",
               "start": "17:40",
-              "end": "18:30"
+              "end": "18:30",
+              "canceled": true
             },
             {
               "id": "mint-breeze-1900",
               "artistId": "cnblue",
               "stageId": "mint-breeze",
               "start": "19:00",
-              "end": "20:00"
+              "end": "20:00",
+              "canceled": true
             },
             {
               "id": "mint-breeze-2030",
               "artistId": "younha",
               "stageId": "mint-breeze",
               "start": "20:30",
-              "end": "21:30"
+              "end": "21:30",
+              "canceled": true
             },
             {
               "id": "club-midnight-sunset-1240",
@@ -579,7 +584,8 @@
               "artistId": "nib-archive",
               "stageId": "loving-forest-garden",
               "start": "15:30",
-              "end": "16:10"
+              "end": "16:10",
+              "canceled": true
             },
             {
               "id": "loving-forest-garden-1630",
