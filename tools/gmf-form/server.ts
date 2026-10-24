@@ -12,7 +12,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { neon } from '@neondatabase/serverless';
 import catalogJson from '../../data/gmf2026/catalog.json';
 import type { Catalog } from '../../packages/judge/src/judge';
-import { parseSubmission } from './logic';
+import { CONTACT_OPEN, parseSubmission } from './logic';
 import type { Submission } from './logic';
 
 const catalog = catalogJson as Catalog;
@@ -35,7 +35,7 @@ export function neonStore(url: string): Store {
               form_version = ${s.formVersion}, record = ${JSON.stringify(s.record)}::jsonb, selection_count = ${s.record.selections.length},
               days = ${days}, user_agent = ${userAgent}, updated_at = now(), submit_count = gmf_records.submit_count + 1`,
       ];
-      if (s.contact)
+      if (CONTACT_OPEN && s.contact)
         queries.push(sql`insert into gmf_contacts (anon_id, contact, consent_result, consent_reshare)
             values (${s.anonId}, ${s.contact.value}, ${s.contact.consentResult}, ${s.contact.consentReshare})
             on conflict (anon_id) do update set

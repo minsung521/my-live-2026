@@ -13,7 +13,7 @@ import type { Catalog, JudgeResult, UserRecord } from '../../packages/judge/src/
 import { GLYPHS, GLYPH_BASE, drawCard, loadCardFonts, loadGlyphs, loadPhoto } from './card';
 import type { CardInput } from './card';
 import { CHIPS, COMMENT_MAX, FEEDBACK_PATH, FIT, QUESTIONS, SHARE, SHOW_PARTS, UNDERSTOOD, feedbackReady } from './feedback';
-import { CONTACT_MAX, FORM_VERSION } from './logic';
+import { CONTACT_MAX, CONTACT_OPEN, FORM_VERSION } from './logic';
 import { TITLE_COLORS, cardSummary, pickTitle, streakSubline } from './titles';
 import type { Pick, TitleResult } from './titles';
 import { track } from './analytics';
@@ -457,7 +457,9 @@ ${q(QUESTIONS.share, chipRow('share', SHARE, false))}
 ${q(QUESTIONS.showParts, chipRow('showParts', SHOW_PARTS, true))}
 ${q(QUESTIONS.chips, chipRow('chips', CHIPS, true))}
 <textarea id="fb-comment" maxlength="${COMMENT_MAX}" rows="3" placeholder="직접 쓸래요">${esc(fb.comment)}</textarea>`;
-  $('#contactbox').innerHTML = `<div class="bhead"><h2>다음 페스티벌 결과도 받아볼래요?</h2><span class="bside">선택</span></div>
+  const cbox = $('#contactbox');
+  cbox.hidden = !CONTACT_OPEN;
+  cbox.innerHTML = !CONTACT_OPEN ? '' : `<div class="bhead"><h2>다음 페스티벌 결과도 받아볼래요?</h2><span class="bside">선택</span></div>
 <input type="text" id="c-value" maxlength="${CONTACT_MAX}" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="인스타 아이디 또는 이메일" value="${esc(fb.contact)}">
 <label class="check"><input type="checkbox" id="c-result"${fb.consentResult ? ' checked' : ''}><span>결과 소식을 받는 데 동의해요</span></label>
 <label class="check"><input type="checkbox" id="c-reshare"${fb.consentReshare ? ' checked' : ''}><span>다음 페스티벌 안내도 받을래요</span></label>`;
@@ -486,7 +488,7 @@ async function post(path: string, body: unknown) {
 async function send() {
   if (!shown || fb.sending) return;
   const t = shown.title;
-  const contact = fb.contact.trim();
+  const contact = CONTACT_OPEN ? fb.contact.trim() : '';
   if (!fb.fbSent && !feedbackReady(fb.fit, fb.understood, fb.share)) return;
   if (contact && !fb.consentResult) {
     fb.error = '연락처를 남기려면 결과 소식 받기에 동의해 주세요';
