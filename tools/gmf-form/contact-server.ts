@@ -8,7 +8,7 @@
  */
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { neon } from '@neondatabase/serverless';
-import { ANON_ID_RE, parseContactFields } from './logic';
+import { ANON_ID_RE, CONTACT_OPEN, parseContactFields } from './logic';
 
 const FESTIVAL_ID = 'gmf2026';
 const BODY_LIMIT = 4 * 1024;
@@ -91,6 +91,7 @@ function send(res: ServerResponse, status: number, body: Record<string, unknown>
 
 export default async function handler(req: IncomingMessage, res: ServerResponse) {
   if (req.method !== 'POST') return send(res, 405, { error: 'POST만 받아요' });
+  if (!CONTACT_OPEN) return send(res, 410, { error: '연락처 수집을 마감했어요' });
   const url = process.env.GMF_DATABASE_URL;
   if (!url) {
     console.error('GMF_DATABASE_URL is not set');

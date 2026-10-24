@@ -17,6 +17,8 @@ export const FORM_VERSION = 'gmf-form v0.4';
 export const SUBMIT_PATH = '/api/gmf-submit';
 export const ANON_ID_RE = /^g-[2-9A-HJ-NP-Z]{8}$/;
 export const CONTACT_MAX = 120;
+/** 연락처 수집 여부. 2026-10-24 MY LIVE 종료로 닫음 — 화면 입력란 숨김 + 연락처 저장 경로(gmf-contact, v1 제출) 차단 */
+export const CONTACT_OPEN = false;
 export const REGRETS_MAX = 60;
 export const CANCELED_ERROR = '취소된 공연은 체크할 수 없어요';
 
